@@ -1,0 +1,4 @@
+[33;1mWARNING: Working tree is dirty. Runner will create commits interleaved with your uncommitted work. Consider 'git worktree add ../todo-run' first.[0m
+==> plan  initialize-vertex-stage0-cargo-crate-at-the-repo-root
+      plan: 51.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\initialize-vertex-stage0-cargo-crate-at-the-repo-root-plan-20260425T212500248.txt
+==> exec  initialize-vertex-stage0-cargo-crate-at-the-repo-root
