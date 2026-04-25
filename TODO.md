@@ -25,7 +25,7 @@
   - [ ] Empty `src/main.rs` (`fn main() { vertex_stage0::run(); }`) and `src/lib.rs` (`pub fn run() {}`)
   - [ ] **Verify:** `test -f Cargo.toml`; `cargo build`
 
-- [ ] Add module skeletons under `src/`
+- [x] Add module skeletons under `src/`
   - [ ] Create empty `mod.rs` files for: `lexer/`, `parser/`, `resolve/`, `typecheck/`, `mir/`, `codegen/`
   - [ ] Create empty `error.rs`, `span.rs`, `util.rs` at `src/`
   - [ ] Wire each into `src/lib.rs` with `pub mod <name>;`

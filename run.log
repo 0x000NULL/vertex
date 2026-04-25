@@ -2,3 +2,9 @@
 ==> plan  initialize-vertex-stage0-cargo-crate-at-the-repo-root
       plan: 51.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\initialize-vertex-stage0-cargo-crate-at-the-repo-root-plan-20260425T212500248.txt
 ==> exec  initialize-vertex-stage0-cargo-crate-at-the-repo-root
+      exec: 6449.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\initialize-vertex-stage0-cargo-crate-at-the-repo-root-execute-20260425T231229391.txt
+      notes: - The plan's verify steps used Unix-style `test -f` from the repo root; I ran them in bash (available per environment) rather than PowerShell, and they all passed. / - File contents match the plan literally: `lib.rs` is `pub fn run() {}` and `main.rs` is `fn main() { vertex_stage0::run(); }`, each with a single trailing newline.
+    [1/123] initialize-vertex-stage0-cargo-crate-at-the-repo-root: plan $0.32 / execute $0.24 / verified / committed 8a342dc
+==> plan  add-module-skeletons-under-src
+      plan: 36.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-module-skeletons-under-src-plan-20260425T231306298.txt
+==> exec  add-module-skeletons-under-src
