@@ -31,7 +31,7 @@
   - [ ] Wire each into `src/lib.rs` with `pub mod <name>;`
   - [ ] **Verify:** `cargo build`; `test -f src/lexer/mod.rs`; `test -f src/parser/mod.rs`; `test -f src/error.rs`; `test -f src/span.rs`
 
-- [ ] Add `runtime/` and `stdlib/` directories with placeholder files
+- [x] Add `runtime/` and `stdlib/` directories with placeholder files
   - [ ] `runtime/vertex_runtime.h` and `runtime/vertex_runtime.c` containing only header guards and a TODO comment
   - [ ] `stdlib/.gitkeep`
   - [ ] **Verify:** `test -f runtime/vertex_runtime.h`; `test -f runtime/vertex_runtime.c`
