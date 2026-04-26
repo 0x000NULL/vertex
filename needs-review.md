@@ -79,3 +79,17 @@ error: could not find `Cargo.toml` in `C:\Users\Ethan\vertex` or any parent dire
 
 ---
 
+
+## define-errorcode-and-errorkind-in-src-error-rs
+- Item: Define `ErrorCode` and `ErrorKind` in `src/error.rs`
+- Reason: verify failed
+- Timestamp: 2026-04-26T02:53:50.9676456Z
+
+### Detail
+```
++ cargo build -p vertex_stage0
+error: could not find `Cargo.toml` in `C:\Users\Ethan\vertex` or any parent directory
+```
+
+---
+

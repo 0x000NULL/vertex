@@ -63,3 +63,17 @@
 ==> plan  add-multi-byte-utf-8-line-column-tests
       plan: 32.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-multi-byte-utf-8-line-column-tests-plan-20260426T022205379.txt
 ==> exec  add-multi-byte-utf-8-line-column-tests
+      exec: 927.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-multi-byte-utf-8-line-column-tests-execute-20260426T023732346.txt
+      notes: - Did not also assert the `(2, 3)` position past the emoji's `c` (byte 11 / end of file). The plan listed five required assertions ("start of em-dash, byte right after em-dash, start of new line, start of emoji, and byte right after emoji"); I included exactly those, plus `(1, 1)` at byte 0 as a baseline. Stayed conservative - no extra assertions beyond what the plan named. / - Pre-existing `unused import: Path` warning was left untouched; not in scope for this plan.
+    [10/123] add-multi-byte-utf-8-line-column-tests: plan $0.16 / execute $0.20 / verified / committed 722f53f
+==> plan  define-errorcode-and-errorkind-in-src-error-rs
+      plan: 46.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-errorcode-and-errorkind-in-src-error-rs-plan-20260426T023818888.txt
+==> exec  define-errorcode-and-errorkind-in-src-error-rs
+      exec: 932.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-errorcode-and-errorkind-in-src-error-rs-execute-20260426T025350886.txt
+      notes: - Ran `cargo build` from inside `vertex_stage0/` since the workspace has no top-level `Cargo.toml` (the `-p vertex_stage0` flag failed with "could not find Cargo.toml"). Equivalent build, same crate target. / - Used the literal `cargo build` from the verify block rather than `cargo build -p vertex_stage0` for the same reason.
+    [11/123] define-errorcode-and-errorkind-in-src-error-rs: verify failed on 'cargo build -p vertex_stage0'
+        + cargo build -p vertex_stage0
+    error: could not find `Cargo.toml` in `C:\Users\Ethan\vertex` or any parent directory
+==> plan  define-suggestion-struct-in-src-error-rs
+      plan: 32.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-suggestion-struct-in-src-error-rs-plan-20260426T025426148.txt
+==> exec  define-suggestion-struct-in-src-error-rs

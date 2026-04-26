@@ -80,7 +80,7 @@
   - [ ] `ErrorKind` enum: `Lexical, Syntax, NameResolution, Type, BorrowCheck, Other`
   - [ ] **Verify:** `cargo build`; `grep -q 'pub struct ErrorCode' src/error.rs`; `grep -q 'pub enum ErrorKind' src/error.rs`
 
-- [ ] Define `Suggestion` struct in `src/error.rs`
+- [x] Define `Suggestion` struct in `src/error.rs`
   - [ ] Fields: `message: String`, `replacement: Option<String>`, `span: Span`
   - [ ] **Verify:** `cargo build`; `grep -q 'pub struct Suggestion' src/error.rs`
 
