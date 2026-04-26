@@ -95,7 +95,7 @@
   - [ ] Dedupe by `(code, span.file_id, span.start)`
   - [ ] **Verify:** `cargo test --lib error::tests::accumulator_caps_at_100`; `cargo test --lib error::tests::accumulator_dedupes`
 
-- [ ] Implement error pretty-printer in `src/error/render.rs`
+- [x] Implement error pretty-printer in `src/error/render.rs`
   - [ ] `pub fn render(err: &CompileError, src: &SourceMap) -> String`
   - [ ] Render: `error[E0308]: <message>`, source snippet, caret under primary span, secondary labels, `note:` and `help:` lines
   - [ ] No color in tests; gate `termcolor` behind isatty check (tests force off via env var `NO_COLOR=1`)

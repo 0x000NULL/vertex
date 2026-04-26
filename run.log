@@ -77,3 +77,25 @@
 ==> plan  define-suggestion-struct-in-src-error-rs
       plan: 32.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-suggestion-struct-in-src-error-rs-plan-20260426T025426148.txt
 ==> exec  define-suggestion-struct-in-src-error-rs
+      exec: 914.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-suggestion-struct-in-src-error-rs-execute-20260426T030940151.txt
+      notes: - The file already existed as a 1-line empty file (not literally non-existent); used `Write` to populate it with the import + struct as specified. / - Did not stage the change with `git add` - the plan's rule 4 said "leave changes staged," but the file was already staged in the initial git status (`MM vertex_stage0/src/error.rs`). New content is on disk; the runner will handle final staging/commit.
+    [12/123] define-suggestion-struct-in-src-error-rs: plan $0.23 / execute $0.29 / verified / committed e83eae7
+==> plan  define-compileerror-struct-in-src-error-rs
+      plan: 79.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-compileerror-struct-in-src-error-rs-plan-20260426T031059736.txt
+==> exec  define-compileerror-struct-in-src-error-rs
+      exec: 67.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-compileerror-struct-in-src-error-rs-execute-20260426T031206780.txt
+      notes: - **Out-of-order execution surfaced, not stubbed.** The prior todo (`define-errorcode-and-errorkind-in-src-error-rs`) has not run - `ErrorCode`/`ErrorKind` do not exist anywhere in the crate. Per the plan's Risks section ("the execute step should detect this . and surface it rather than silently inventing stubs"), I wrote the file exactly as specified, referencing `ErrorCode` and `ErrorKind`, and am reporting the resulting compile failure. The build and test verify commands therefore fail; the three grep verifies pass. / - **`use crate::error::{ErrorCode, ErrorKind};` import omitted.** Step 1 says to "rely on local items defined by the prior todo," and `Suggestion` / `Span` usage in this same file already follows that pattern (no self-import of local items). I did not add a self-referential `use crate::error::.` line.
+    [13/123] define-compileerror-struct-in-src-error-rs: verify failed on 'cargo test --lib --manifest-path vertex_stage0/Cargo.toml error::tests::compile_error_builder_chains'
+           |                              ^^^^^^^^^ not found in this scope
+    Some errors have detailed explanations: E0425, E0433.
+    For more information about an error, try `rustc --explain E0425`.
+    warning: `vertex_stage0` (lib test) generated 1 warning
+    error: could not compile `vertex_stage0` (lib test) due to 8 previous errors; 1 warning emitted
+==> plan  implement-erroraccumulator-in-src-error-rs
+      plan: 104.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-erroraccumulator-in-src-error-rs-plan-20260426T031358524.txt
+    [14/123] implement-erroraccumulator-in-src-error-rs: 1 cross-item, 0 local blockers -> needs-review
+        [cross-item] Should this item bootstrap the missing prereq types (ErrorCode, ErrorKind, CompileError) so it can compile, or wait for the earlier two TODO items to be re-attempted and merged first?
+          default: Bootstrap them inline, using the field/method shapes already specified in `compiler_architecture.md` 6 and TODO lines 79-90 so a re-run of the earlier items will be a no-op reconcile rather than a conflict.
+==> plan  implement-error-pretty-printer-in-src-error-render-rs
+      plan: 116.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-error-pretty-printer-in-src-error-render-rs-plan-20260426T031554601.txt
+==> exec  implement-error-pretty-printer-in-src-error-render-rs
