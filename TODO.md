@@ -67,7 +67,7 @@
   - [ ] Methods: `pub fn add_file(&mut self, name, content) -> FileId`, `pub fn snippet(&self, span) -> &str`, `pub fn line_col(&self, file, byte_offset) -> (u32, u32)`
   - [ ] **Verify:** `cargo test --lib span::tests::source_map_round_trip_ascii_and_utf8`
 
-- [ ] Add multi-byte UTF-8 line/column tests
+- [x] Add multi-byte UTF-8 line/column tests
   - [ ] In `span.rs` tests module: include input with em-dash and emoji; assert line/col correct
   - [ ] **Verify:** `cargo test --lib span::tests::line_col_handles_multibyte`
 

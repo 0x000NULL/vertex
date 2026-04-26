@@ -103,4 +103,19 @@ mod tests {
         assert_eq!(map.line_col(utf8_id, 5), (2, 1));
         assert_eq!(map.line_col(utf8_id, 9), (2, 3));
     }
+
+    #[test]
+    fn line_col_handles_multibyte() {
+        let mut map = SourceMap::new();
+        let id = map.add_file("m.vx", "a—b\n😀c");
+
+        assert_eq!(map.snippet(Span::new(id, 1, 4)), "—");
+        assert_eq!(map.snippet(Span::new(id, 6, 10)), "😀");
+
+        assert_eq!(map.line_col(id, 0), (1, 1));
+        assert_eq!(map.line_col(id, 1), (1, 2));
+        assert_eq!(map.line_col(id, 4), (1, 3));
+        assert_eq!(map.line_col(id, 6), (2, 1));
+        assert_eq!(map.line_col(id, 10), (2, 2));
+    }
 }

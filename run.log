@@ -51,3 +51,15 @@
 ==> exec  implement-span-struct-in-src-span-rs
       exec: 936.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-span-struct-in-src-span-rs-execute-20260426T020451871.txt
       notes: - Ran cargo from inside `vertex_stage0/` (no top-level workspace `Cargo.toml` exists), so the `-p vertex_stage0` flag was unusable; the resulting test/build are equivalent. / - Used `u32::saturating_sub` for `len()` per the plan to keep the type infallible on malformed spans.
+    [8/123] implement-span-struct-in-src-span-rs: verify failed on 'cargo test -p vertex_stage0 --lib span::tests::span_merge_takes_outer_bounds'
+        + cargo test -p vertex_stage0 --lib span::tests::span_merge_takes_outer_bounds
+    error: could not find `Cargo.toml` in `C:\Users\Ethan\vertex` or any parent directory
+==> plan  implement-sourcemap-struct-in-src-span-rs
+      plan: 50.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-sourcemap-struct-in-src-span-rs-plan-20260426T020546401.txt
+==> exec  implement-sourcemap-struct-in-src-span-rs
+      exec: 946.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-sourcemap-struct-in-src-span-rs-execute-20260426T022132344.txt
+      notes: - The plan explicitly specified `use std::path::{Path, PathBuf};` but only `PathBuf` is referenced in the implementation. I followed the plan literally, which yields one `unused_imports` warning. I did not remove `Path` because the plan called it out by name; if you'd prefer no warning, drop `Path` from the import. / - For `add_file`, I used `let content = content.into();` once and pass `&content` to `compute_line_starts` to avoid double-converting; semantically identical to the plan.
+    [9/123] implement-sourcemap-struct-in-src-span-rs: plan $0.24 / execute $0.36 / verified / committed 5e8d6db
+==> plan  add-multi-byte-utf-8-line-column-tests
+      plan: 32.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-multi-byte-utf-8-line-column-tests-plan-20260426T022205379.txt
+==> exec  add-multi-byte-utf-8-line-column-tests
