@@ -36,7 +36,7 @@
   - [ ] `stdlib/.gitkeep`
   - [ ] **Verify:** `test -f runtime/vertex_runtime.h`; `test -f runtime/vertex_runtime.c`
 
-- [ ] Add `tests/integration/` directory with a smoke test
+- [x] Add `tests/integration/` directory with a smoke test
   - [ ] `tests/integration/smoke.rs` containing `#[test] fn crate_runs() { vertex_stage0::run(); }`
   - [ ] **Verify:** `cargo test --test smoke crate_runs`
 

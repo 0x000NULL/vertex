@@ -12,3 +12,11 @@
       notes: - Created all nine new files as zero-byte (truly empty) files, matching the plan's "empty" specification. / - Wrote `lib.rs` with the nine `pub mod` declarations followed by the preserved `pub fn run() {}` entry point (blank line between the two groups for readability).
     [2/123] add-module-skeletons-under-src: plan $0.25 / execute $0.45 / verified / committed 79321a1
 ==> plan  add-runtime-and-stdlib-directories-with-placeholder-files
+      plan: 23.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-runtime-and-stdlib-directories-with-placeholder-files-plan-20260425T233904939.txt
+==> exec  add-runtime-and-stdlib-directories-with-placeholder-files
+      exec: 32.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-runtime-and-stdlib-directories-with-placeholder-files-execute-20260425T233936976.txt
+      notes: - Header guard macro chosen as `VERTEX_RUNTIME_H` (uppercase, file-name-derived) per plan assumption. / - TODO comment text used: `// TODO: implement Vertex runtime` - same line in both `.h` (inside the guards) and `.c` (after the include).
+    [3/123] add-runtime-and-stdlib-directories-with-placeholder-files: plan $0.15 / execute $0.25 / verified / committed 864d180
+==> plan  add-tests-integration-directory-with-a-smoke-test
+      plan: 44.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-tests-integration-directory-with-a-smoke-test-plan-20260425T234021747.txt
+==> exec  add-tests-integration-directory-with-a-smoke-test
