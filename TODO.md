@@ -52,7 +52,7 @@
 
 ## 1. Source-location infrastructure
 
-- [ ] Implement `FileId` newtype in `src/span.rs`
+- [x] Implement `FileId` newtype in `src/span.rs`
   - [ ] `pub struct FileId(pub u32);` with `Copy, Clone, PartialEq, Eq, Hash, Debug`
   - [ ] **Verify:** `cargo build`; `grep -q 'pub struct FileId' src/span.rs`
 
