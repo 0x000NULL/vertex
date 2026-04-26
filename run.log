@@ -20,3 +20,11 @@
 ==> plan  add-tests-integration-directory-with-a-smoke-test
       plan: 44.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-tests-integration-directory-with-a-smoke-test-plan-20260425T234021747.txt
 ==> exec  add-tests-integration-directory-with-a-smoke-test
+      exec: 5755.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-tests-integration-directory-with-a-smoke-test-execute-20260426T011616806.txt
+      notes: - Inserted the new `[[test]]` table after the existing `[[bin]]` block (separated by a blank line) to keep TOML readable; the plan only required that the entry exist, not its position. / - No conservative reinterpretations of plan semantics were needed; followed the plan literally.
+    [4/123] add-tests-integration-directory-with-a-smoke-test: plan $0.22 / execute $0.27 / verified / committed a6d324b
+==> plan  add-ci-workflow
+      plan: 37.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-ci-workflow-plan-20260426T011654642.txt
+==> exec  add-ci-workflow
+      exec: 935.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-ci-workflow-execute-20260426T013229690.txt
+      notes: - Added a `defaults.run.working-directory: vertex_stage0` block on the job rather than repeating `working-directory:` on each cargo step. Same effect, less repetition; satisfies the plan's risk-mitigation requirement that cargo runs from `vertex_stage0/`. / - Triggered the workflow on `push` and `pull_request` with no branch filter (matches the plan's "conventional default").

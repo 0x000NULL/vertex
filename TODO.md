@@ -44,7 +44,7 @@
   - [ ] `.github/workflows/ci.yml` running `cargo build`, `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check`
   - [ ] **Verify:** `test -f .github/workflows/ci.yml`; `grep -q 'cargo clippy' .github/workflows/ci.yml`
 
-- [ ] Add stub `CHANGELOG.md` and `CONTRIBUTING.md`
+- [x] Add stub `CHANGELOG.md` and `CONTRIBUTING.md`
   - [ ] One-line content each; runner adds real content later if requested
   - [ ] **Verify:** `test -f CHANGELOG.md`; `test -f CONTRIBUTING.md`
 
