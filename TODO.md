@@ -62,7 +62,7 @@
   - [ ] Derives: `Copy, Clone, PartialEq, Eq, Debug`
   - [ ] **Verify:** `cargo test --lib span::tests::span_merge_takes_outer_bounds`
 
-- [ ] Implement `SourceMap` struct in `src/span.rs`
+- [x] Implement `SourceMap` struct in `src/span.rs`
   - [ ] Field: `files: Vec<SourceFile>` where `SourceFile { id: FileId, name: PathBuf, content: String, line_starts: Vec<u32> }`
   - [ ] Methods: `pub fn add_file(&mut self, name, content) -> FileId`, `pub fn snippet(&self, span) -> &str`, `pub fn line_col(&self, file, byte_offset) -> (u32, u32)`
   - [ ] **Verify:** `cargo test --lib span::tests::source_map_round_trip_ascii_and_utf8`

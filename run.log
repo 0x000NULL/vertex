@@ -28,3 +28,26 @@
 ==> exec  add-ci-workflow
       exec: 935.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-ci-workflow-execute-20260426T013229690.txt
       notes: - Added a `defaults.run.working-directory: vertex_stage0` block on the job rather than repeating `working-directory:` on each cargo step. Same effect, less repetition; satisfies the plan's risk-mitigation requirement that cargo runs from `vertex_stage0/`. / - Triggered the workflow on `push` and `pull_request` with no branch filter (matches the plan's "conventional default").
+    [5/123] add-ci-workflow: verify failed on 'cargo fmt --check --manifest-path vertex_stage0/Cargo.toml'
+        [31m-fn main() { vertex_stage0::run(); }
+    [0m[32m+fn main() {
+    [0m[32m+    vertex_stage0::run();
+    [0m[32m+}
+    [0m 
+==> plan  add-stub-changelog-md-and-contributing-md
+      plan: 13.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-stub-changelog-md-and-contributing-md-plan-20260426T013247080.txt
+==> exec  add-stub-changelog-md-and-contributing-md
+      exec: 21.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-stub-changelog-md-and-contributing-md-execute-20260426T013308125.txt
+      notes: - Interpreted the plan's "one-line stub" as a markdown `#` heading plus a single placeholder sentence, matching the example in the plan's Files section. This produces ~3 lines including a blank separator, which is the standard markdown form for a stub. / - LFCRLF git warnings on stage are expected on Windows and harmless; no action taken.
+    [6/123] add-stub-changelog-md-and-contributing-md: plan $0.11 / execute $0.20 / verified / committed 1f92bd3
+==> plan  implement-fileid-newtype-in-src-span-rs
+      plan: 30.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-fileid-newtype-in-src-span-rs-plan-20260426T013338522.txt
+==> exec  implement-fileid-newtype-in-src-span-rs
+      exec: 913.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-fileid-newtype-in-src-span-rs-execute-20260426T014851443.txt
+      notes: - Edited `vertex_stage0/src/span.rs` (the real path) rather than the literal `src/span.rs` from the todo, per the plan's Risks section. / - Used derive order exactly as listed: `Copy, Clone, PartialEq, Eq, Hash, Debug`.
+    [7/123] implement-fileid-newtype-in-src-span-rs: plan $0.18 / execute $0.24 / verified / committed 2683ffb
+==> plan  implement-span-struct-in-src-span-rs
+      plan: 24.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-span-struct-in-src-span-rs-plan-20260426T014915967.txt
+==> exec  implement-span-struct-in-src-span-rs
+      exec: 936.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-span-struct-in-src-span-rs-execute-20260426T020451871.txt
+      notes: - Ran cargo from inside `vertex_stage0/` (no top-level workspace `Cargo.toml` exists), so the `-p vertex_stage0` flag was unusable; the resulting test/build are equivalent. / - Used `u32::saturating_sub` for `len()` per the plan to keep the type infallible on malformed spans.
