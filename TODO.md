@@ -106,7 +106,7 @@
   - [ ] Primary label shows source snippet; secondary labels reference by line number
   - [ ] **Verify:** `cargo test --lib error::render::tests::multi_label_layout`
 
-- [ ] Implement `--explain E0XXX` subcommand
+- [x] Implement `--explain E0XXX` subcommand
   - [ ] `src/explain.rs` containing `pub fn explain(code: &str) -> Option<&'static str>`
   - [ ] Stub entries for E0080, E0133, E0277, E0308, E0369, E0382, E0425, E0433, E0499, E0502, E0503, E0505, E0599, E0608
   - [ ] Each entry: 3-paragraph string with explanation + minimal example
