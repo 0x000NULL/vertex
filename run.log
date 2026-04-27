@@ -355,3 +355,7 @@
 ==> plan  define-stmt-enum-in-src-ast-stmt-rs
       plan: 131.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-stmt-enum-in-src-ast-stmt-rs-plan-20260427T051721469.txt
 ==> exec  define-stmt-enum-in-src-ast-stmt-rs
+      exec: 66.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-stmt-enum-in-src-ast-stmt-rs-execute-20260427T051827507.txt
+      notes: - Imported `Stmt` by extending the existing `use crate::ast::NodeId;` line into `use crate::ast::{NodeId, Stmt};` rather than adding a separate `use` statement, since merging into the existing same-path import is idiomatic and matches the style elsewhere in this crate (e.g. `ty.rs` uses `use crate::ast::{expr::Path, NodeId};`). The plan said "add `use crate::ast::Stmt;`" — both forms produce the same import; I chose the merged form as the more conservative/idiomatic interpretation. / - Did not add any `impl Stmt { fn id() / fn span() }` accessors, per the plan's Assumptions section.
+    [2/72] define-stmt-enum-in-src-ast-stmt-rs: plan $0.77 / execute $0.54 / verified / committed 55b0c50
+==> plan  define-generics-and-whereclause-in-src-ast-generics-rs

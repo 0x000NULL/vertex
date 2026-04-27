@@ -289,7 +289,7 @@
   - [ ] Variants: `Wild, Ident { name, mutable, sub }, Literal(Lit), Range { start, end, inclusive }, Tuple(Vec<Pattern>), Struct { path, fields, rest }, TupleStruct { path, elems }, Ref { mutable, pattern }, Or(Vec<Pattern>)`
   - [ ] **Verify:** `cargo build`; `grep -q 'pub enum Pattern' src/ast/pat.rs`
 
-- [ ] Define `Generics` and `WhereClause` in `src/ast/generics.rs`
+- [x] Define `Generics` and `WhereClause` in `src/ast/generics.rs`
   - [ ] `Generics { params: Vec<TypeParam>, where_clause: Option<WhereClause> }`
   - [ ] `TypeParam { name, bounds: Vec<TraitBound> }`
   - [ ] `WhereClause { predicates: Vec<WherePred> }`
