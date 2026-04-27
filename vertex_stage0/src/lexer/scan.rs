@@ -818,7 +818,7 @@ impl<'a> Scanner<'a> {
         let ch = rest.chars().next().expect("peek was Some, so a char must exist");
         self.pos += ch.len_utf8();
         let span = Span::new(self.file_id, start, self.pos as u32);
-        Token::new(TokenKind::Error(ch.to_string()), span)
+        Token::new(TokenKind::Error(format!("invalid character: {}", ch)), span)
     }
 
     fn scan_int_suffix(&mut self) -> IntSuffix {
@@ -1617,5 +1617,62 @@ mod tests {
         all.eat_while(|b| b == b' ');
         assert_eq!(all.pos, 3);
         assert_eq!(all.peek(), None);
+    }
+
+    #[test]
+    fn invalid_char_recovers() {
+        let src = "a $ b @ c € d";
+        let file_id = FileId(11);
+        let mut s = Scanner::new(src, file_id);
+
+        let mut tokens: Vec<Token> = Vec::new();
+        loop {
+            let t = s.next_token();
+            let is_eof = matches!(&t.kind, TokenKind::Eof);
+            tokens.push(t);
+            if is_eof {
+                break;
+            }
+        }
+
+        let kinds: Vec<TokenKind> = tokens.iter().map(|t| t.kind.clone()).collect();
+        let expected = vec![
+            TokenKind::Ident("a".to_string()),
+            TokenKind::Error("invalid character: $".to_string()),
+            TokenKind::Ident("b".to_string()),
+            TokenKind::Error("invalid character: @".to_string()),
+            TokenKind::Ident("c".to_string()),
+            TokenKind::Error("invalid character: \u{20ac}".to_string()),
+            TokenKind::Ident("d".to_string()),
+            TokenKind::Eof,
+        ];
+        assert_eq!(kinds, expected);
+
+        for t in &tokens {
+            assert_eq!(t.span.file_id, file_id);
+        }
+
+        let errors: Vec<&Token> = tokens
+            .iter()
+            .filter(|t| matches!(t.kind, TokenKind::Error(_)))
+            .collect();
+        assert_eq!(errors.len(), 3);
+
+        let dollar_span = errors[0].span;
+        assert_eq!(dollar_span.end - dollar_span.start, '$'.len_utf8() as u32);
+        assert_eq!(dollar_span.end - dollar_span.start, 1);
+
+        let at_span = errors[1].span;
+        assert_eq!(at_span.end - at_span.start, '@'.len_utf8() as u32);
+        assert_eq!(at_span.end - at_span.start, 1);
+
+        let euro_span = errors[2].span;
+        assert_eq!(euro_span.end - euro_span.start, '\u{20ac}'.len_utf8() as u32);
+        assert!(euro_span.end - euro_span.start > 1);
+
+        let last = tokens.last().expect("tokens has Eof");
+        assert!(matches!(last.kind, TokenKind::Eof));
+        assert_eq!(last.span.start, last.span.end);
+        assert_eq!(last.span.start as usize, src.len());
     }
 }

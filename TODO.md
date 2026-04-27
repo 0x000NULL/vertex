@@ -210,7 +210,7 @@
 
 ## 5. Lexer error recovery
 
-- [ ] Invalid character recovery
+- [x] Invalid character recovery
   - [ ] Emit `TokenKind::Error("invalid character: <ch>".to_string())`; advance one codepoint; continue
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::invalid_char_recovers`
 
