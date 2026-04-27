@@ -145,9 +145,18 @@ pub struct TraitItemConst {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
+pub enum ModKind {
+    External,
+    Inline(Vec<Item>),
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub struct ModDef {
     pub id: NodeId,
     pub span: Span,
+    pub name: String,
+    pub kind: ModKind,
 }
 
 #[allow(dead_code)]

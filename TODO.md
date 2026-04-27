@@ -486,7 +486,7 @@
 
 ## 14. Item parsers — modules + use
 
-- [ ] Parse `mod foo;` (file-loaded) vs `mod foo { ... }` (inline)
+- [x] Parse `mod foo;` (file-loaded) vs `mod foo { ... }` (inline)
   - [ ] Both forms produce `ModDef` with `kind: ModKind::External | ModKind::Inline(items)`
   - [ ] **Verify:** `cargo test --lib parser::item::tests::mod_external_vs_inline`
 

@@ -1,8 +1,8 @@
 use crate::ast::expr::{Expr, GenericArg, IntLit, Path, PathSegment};
 use crate::ast::generics::{Generics, TraitBound, TypeParam, WhereClause, WherePred};
 use crate::ast::item::{
-    EnumDef, EnumVariant, Field, FnDef, Item, Param, StructDef, StructKind, TraitDef, TraitItem,
-    TraitItemConst, TraitItemFn, TraitItemType, VariantKind,
+    EnumDef, EnumVariant, Field, FnDef, Item, ModDef, ModKind, Param, StructDef, StructKind,
+    TraitDef, TraitItem, TraitItemConst, TraitItemFn, TraitItemType, VariantKind,
 };
 use crate::ast::ty::Type;
 use crate::error::{CompileError, ErrorCode, ErrorKind};
@@ -905,6 +905,67 @@ impl Parser {
             default,
         }))
     }
+
+    pub fn parse_mod(&mut self) -> Result<Item, CompileError> {
+        let mod_kw = self.expect(&TokenKind::Mod)?;
+        let start_span = mod_kw.span;
+
+        let name_tok = self.expect(&TokenKind::Ident(String::new()))?;
+        let name = match name_tok.kind {
+            TokenKind::Ident(s) => s,
+            _ => unreachable!(),
+        };
+
+        let (kind, end_span) = match self.peek() {
+            TokenKind::Semi => {
+                let semi_tok = self.bump();
+                (ModKind::External, semi_tok.span)
+            }
+            TokenKind::LBrace => {
+                self.bump();
+                let mut items: Vec<Item> = Vec::new();
+                while !matches!(self.peek(), TokenKind::RBrace) {
+                    items.push(self.parse_mod_inline_item()?);
+                }
+                let rbrace_tok = self.expect(&TokenKind::RBrace)?;
+                (ModKind::Inline(items), rbrace_tok.span)
+            }
+            _ => {
+                let _ = self.expect_one_of(&[TokenKind::Semi, TokenKind::LBrace])?;
+                unreachable!();
+            }
+        };
+
+        let span = start_span.merge(&end_span);
+        let id = self.new_node_id();
+        Ok(Item::Mod(ModDef {
+            id,
+            span,
+            name,
+            kind,
+        }))
+    }
+
+    fn parse_mod_inline_item(&mut self) -> Result<Item, CompileError> {
+        match self.peek() {
+            TokenKind::Fn => self.parse_fn(),
+            TokenKind::Struct => self.parse_struct(),
+            TokenKind::Enum => self.parse_enum(),
+            TokenKind::Trait => self.parse_trait(),
+            TokenKind::Mod => self.parse_mod(),
+            _ => {
+                let _ = self.expect_one_of(&[
+                    TokenKind::Fn,
+                    TokenKind::Struct,
+                    TokenKind::Enum,
+                    TokenKind::Trait,
+                    TokenKind::Mod,
+                    TokenKind::RBrace,
+                ])?;
+                unreachable!();
+            }
+        }
+    }
 }
 
 fn type_span(ty: &Type) -> crate::span::Span {
@@ -1764,6 +1825,87 @@ mod tests {
                 assert_eq!(type_ident(&c.ty), "usize");
             }
             other => panic!("expected TraitItem::Const, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+    }
+
+    fn as_mod(item: Item) -> ModDef {
+        match item {
+            Item::Mod(m) => m,
+            other => panic!("expected Item::Mod, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn mod_external_vs_inline() {
+        // mod foo;
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Mod),
+            ident_tok("foo"),
+            tok(TokenKind::Semi),
+            tok(TokenKind::Eof),
+        ]);
+        let m = as_mod(p.parse_mod().expect("parse_mod"));
+        assert_eq!(m.name, "foo");
+        assert!(matches!(m.kind, ModKind::External));
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // mod bar { fn x() {} }
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Mod),
+            ident_tok("bar"),
+            tok(TokenKind::LBrace),
+            tok(TokenKind::Fn),
+            ident_tok("x"),
+            tok(TokenKind::LParen),
+            tok(TokenKind::RParen),
+            tok(TokenKind::LBrace),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let m = as_mod(p.parse_mod().expect("parse_mod"));
+        assert_eq!(m.name, "bar");
+        match m.kind {
+            ModKind::Inline(items) => {
+                assert_eq!(items.len(), 1);
+                match &items[0] {
+                    Item::Fn(f) => assert_eq!(f.name, "x"),
+                    other => panic!("expected Item::Fn, got {:?}", other),
+                }
+            }
+            other => panic!("expected ModKind::Inline, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // mod outer { mod inner; }
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Mod),
+            ident_tok("outer"),
+            tok(TokenKind::LBrace),
+            tok(TokenKind::Mod),
+            ident_tok("inner"),
+            tok(TokenKind::Semi),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let m = as_mod(p.parse_mod().expect("parse_mod"));
+        assert_eq!(m.name, "outer");
+        match m.kind {
+            ModKind::Inline(items) => {
+                assert_eq!(items.len(), 1);
+                match &items[0] {
+                    Item::Mod(inner) => {
+                        assert_eq!(inner.name, "inner");
+                        assert!(matches!(inner.kind, ModKind::External));
+                    }
+                    other => panic!("expected Item::Mod, got {:?}", other),
+                }
+            }
+            other => panic!("expected ModKind::Inline, got {:?}", other),
         }
         assert!(p.errors.is_empty());
         assert!(matches!(p.peek(), TokenKind::Eof));

@@ -321,3 +321,16 @@ plan=1.01426675 exec=2.3542085 total=3.36847525
 
 ---
 
+
+## parse-inherent-and-trait-impls
+- Item: Parse inherent and trait impls
+- Reason: cost ceiling
+- Timestamp: 2026-04-27T08:07:10.2187487Z
+
+### Detail
+```
+plan=1.485589 exec=1.56351175 total=3.04910075
+```
+
+---
+
