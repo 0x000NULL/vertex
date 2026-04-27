@@ -1,71 +1,4 @@
 
-## add-ci-workflow
-- Item: Add CI workflow
-- Reason: verify failed
-- Timestamp: 2026-04-26T01:32:30.0994521Z
-
-### Detail
-```
-+ test -f .github/workflows/ci.yml
-+ grep -q 'cargo build' .github/workflows/ci.yml
-+ grep -q 'cargo test' .github/workflows/ci.yml
-+ grep -q 'cargo clippy --all-targets -- -D warnings' .github/workflows/ci.yml
-+ grep -q 'cargo fmt --check' .github/workflows/ci.yml
-+ cargo fmt --check --manifest-path vertex_stage0/Cargo.toml
-Diff in \\?\C:\Users\Ethan\vertex\vertex_stage0\src\codegen\mod.rs:1:
-[32m+
-[0m[32m+
-[0mDiff in \\?\C:\Users\Ethan\vertex\vertex_stage0\src\error.rs:1:
-[32m+
-[0m[32m+
-[0mDiff in \\?\C:\Users\Ethan\vertex\vertex_stage0\src\lexer\mod.rs:1:
-[32m+
-[0m[32m+
-[0mDiff in \\?\C:\Users\Ethan\vertex\vertex_stage0\src\lib.rs:1:
-[32m+pub mod codegen;
-[0m[32m+pub mod error;
-[0m pub mod lexer;
-[32m+pub mod mir;
-[0m pub mod parser;
- pub mod resolve;
-[31m-pub mod typecheck;
-[0m[31m-pub mod mir;
-[0m[31m-pub mod codegen;
-[0m[31m-pub mod error;
-[0m pub mod span;
-[32m+pub mod typecheck;
-[0m pub mod util;
- 
- pub fn run() {}
-Diff in \\?\C:\Users\Ethan\vertex\vertex_stage0\src\mir\mod.rs:1:
-[32m+
-[0m[32m+
-[0mDiff in \\?\C:\Users\Ethan\vertex\vertex_stage0\src\parser\mod.rs:1:
-[32m+
-[0m[32m+
-[0mDiff in \\?\C:\Users\Ethan\vertex\vertex_stage0\src\resolve\mod.rs:1:
-[32m+
-[0m[32m+
-[0mDiff in \\?\C:\Users\Ethan\vertex\vertex_stage0\src\span.rs:1:
-[32m+
-[0m[32m+
-[0mDiff in \\?\C:\Users\Ethan\vertex\vertex_stage0\src\typecheck\mod.rs:1:
-[32m+
-[0m[32m+
-[0mDiff in \\?\C:\Users\Ethan\vertex\vertex_stage0\src\util.rs:1:
-[32m+
-[0m[32m+
-[0mDiff in \\?\C:\Users\Ethan\vertex\vertex_stage0\src\main.rs:1:
-[31m-fn main() { vertex_stage0::run(); }
-[0m[32m+fn main() {
-[0m[32m+    vertex_stage0::run();
-[0m[32m+}
-[0m
-```
-
----
-
-
 <!-- 3 entries removed 2026-04-26 after workspace Cargo.toml added at repo root:
      implement-span-struct-in-src-span-rs, define-errorcode-and-errorkind-in-src-error-rs,
      define-compileerror-struct-in-src-error-rs. All three failed verify with
@@ -73,57 +6,12 @@ Diff in \\?\C:\Users\Ethan\vertex\vertex_stage0\src\mir\mod.rs:1:
      present, removing the slug entries lets the runner re-queue them on the
      next iteration. -->
 
-
-## implement-erroraccumulator-in-src-error-rs
-- Item: Implement `ErrorAccumulator` in `src/error.rs`
-- Reason: blockers
-- Timestamp: 2026-04-26T03:13:58.5753971Z
-
-### Blocker: CompileError / ErrorCode / ErrorKind do not yet exist in error.rs
-- severity: cross-item
-- affects: define-compileerror-struct-in-src-error-rs, define-errorcode-and-errorkind, error-pretty-printer, parser eat/expect, parse-failure-recovery
-- question: Should this item bootstrap the missing prereq types (ErrorCode, ErrorKind, CompileError) so it can compile, or wait for the earlier two TODO items to be re-attempted and merged first?
-- default_assumption: Bootstrap them inline, using the field/method shapes already specified in `compiler_architecture.md` §6 and TODO lines 79–90 so a re-run of the earlier items will be a no-op reconcile rather than a conflict.
-- Resolution: workspace `Cargo.toml` added 2026-04-26 — items `define-errorcode-and-errorkind-in-src-error-rs` and `define-compileerror-struct-in-src-error-rs` will be re-queued first in TODO order, so prereq types will exist by the time this item re-runs. Wait for those, then proceed normally (no inline bootstrap needed).
-
----
-
-
-## define-compileerror-struct-in-src-error-rs
-- Item: Define `CompileError` struct in `src/error.rs`
-- Reason: verify failed
-- Timestamp: 2026-04-27T02:56:32.2216795Z
-
-### Detail
-```
-+ cargo test --lib -p vertex_stage0 error::tests::compile_error_builder_chains
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
-     Running unittests src\lib.rs (target\debug\deps\vertex_stage0-98f9861405ee0bf7.exe)
-
-running 1 test
-test error::tests::compile_error_builder_chains ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
-
-+ cargo fmt --all -- --check
-+ cargo clippy --all-targets -- -D warnings
-    Checking vertex_stage0 v0.1.0 (C:\Users\Ethan\vertex\vertex_stage0)
-error: struct `Span` has a public `len` method, but no `is_empty` method
-  --> vertex_stage0\src\span.rs:22:5
-   |
-22 |     pub fn len(&self) -> u32 {
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#len_without_is_empty
-   = note: `-D clippy::len-without-is-empty` implied by `-D warnings`
-   = help: to override `-D warnings` add `#[allow(clippy::len_without_is_empty)]`
-
-error: could not compile `vertex_stage0` (lib) due to 1 previous error
-warning: build failed, waiting for other jobs to finish...
-error: could not compile `vertex_stage0` (lib test) due to 1 previous error
-```
-
----
+<!-- 3 stale entries removed 2026-04-27 after they succeeded in the current run
+     and would otherwise be replayed by -RetryNeedsReview:
+       - add-ci-workflow                              committed 0c13210
+       - implement-erroraccumulator-in-src-error-rs   committed 2af5137
+       - define-compileerror-struct-in-src-error-rs   self-healed by item 5
+                                                      (Span::is_empty added in 2af5137) -->
 
 
 ## define-stmt-enum-in-src-ast-stmt-rs
@@ -136,14 +24,14 @@ error: could not compile `vertex_stage0` (lib test) due to 1 previous error
 - affects: define-expr-enum-in-src-ast-expr-rs-literal-path-variants, define-type-enum-in-src-ast-ty-rs, define-pattern-enum-in-src-ast-pat-rs
 - question: Will the runner honor the Prereqs section and ensure `Expr`, `Ty`, and `Pattern` modules exist before this item executes?
 - default_assumption: If a prereq is missing at execute time, land a minimal placeholder module (e.g. `pub enum Pattern {}` in `pat.rs`, same for `expr.rs` and `ty.rs`) inline as part of this commit, so `Stmt` compiles. Accept that the dedicated prereq items may need to merge into / overwrite those placeholders later.
-- Resolution: 
+- Resolution: Accept default — note all three prereq items (35 Expr, 39 Type, 40 Pattern) have already landed, so placeholder fallback should not trigger
 
 ### Blocker: Pattern vs Pat naming
 - severity: local
 - affects: define-pattern-enum-in-src-ast-pat-rs
 - question: Is the type named `Pattern` (per the spec wording) or `Pat` (a common shorter convention also hinted at by `pat.rs`)?
 - default_assumption: Use `Pattern` since the task spec writes `pattern: Pattern` explicitly; if the prereq lands `Pat`, follow that and update the field type to `Pat`.
-- Resolution: 
+- Resolution: Accept default — item 40 shipped `Pattern`, so use that
 
 ---
 
@@ -158,7 +46,138 @@ error: could not compile `vertex_stage0` (lib test) due to 1 previous error
 - affects: where-clause parsing, generics parsing, future trait/impl items
 - question: Should `WherePred` be a struct `{ ty: Type, bounds: Vec<TraitBound> }`, an enum covering `Type: Bounds` / `'a: 'b` / `T = U`, or include a `span`/`id`?
 - default_assumption: Define `WherePred` as a single struct `{ ty: Type, bounds: Vec<TraitBound> }` with no id/span; later items can extend it (extra fields) or promote it to an enum once lifetime and equality predicates are needed. This is the smallest shape consistent with the spec's `predicates: Vec<WherePred>` bullet.
-- Resolution: 
+- Resolution: Accept default
+
+---
+
+
+## parse-path-expressions
+- Item: Parse path expressions
+- Reason: blockers
+- Timestamp: 2026-04-27T04:42:27.5559609Z
+
+### Blocker: turbofish args representation
+- severity: cross-item
+- affects: parse-path-expressions, parse-path-types-with-generic-args, define-generics-and-whereclause-in-src-ast-generics-rs, parse-function-call-method-call-field-access
+- question: Should `parse_path` store `GenericArg::Placeholder` per turbofish arg today and let the generics item migrate them later, or wait until a real `GenericArg` enum exists?
+- default_assumption: Push one `GenericArg::Placeholder` per comma-separated arg now; the generics item will widen `GenericArg` and update consumers. Test asserts only `.len()`, not identity.
+- Resolution: Accept default
+
+### Blocker: Self / self as path head
+- severity: local
+- affects: parse-path-expressions, parse-self-parameters, parse-inherent-and-trait-impls
+- question: Should `parse_path` accept `Self` and `self` keyword tokens as the head segment, or restrict heads to plain `Ident`?
+- default_assumption: Accept both `SelfUpper` and `SelfLower` as path heads (treating them as ident-equivalent segments named "Self"/"self"). Removable in one line if the verify test rejects it.
+- Resolution: Accept default
+
+---
+
+
+## parse-parenthesized-tuple-unit
+- Item: Parse parenthesized + tuple + unit
+- Reason: blockers
+- Timestamp: 2026-04-27T04:44:20.5908375Z
+
+### Blocker: paren-preserving AST node
+- severity: cross-item
+- affects: parse-parenthesized-tuple-unit, parse-range-expressions, ast-pretty-printer-in-src-ast-printer-rs, pratt-parser-for-binary-operators
+- question: Should `(expr)` add a wrapper node (`Expr::Paren`) that preserves the parentheses for the pretty-printer, or be unwrapped to the inner `Expr`?
+- default_assumption: Unwrap to the inner expression (no `Paren` variant). Matches Rust's rustc/syn behavior. The pretty-printer can re-insert parens based on precedence.
+- Resolution: Accept default
+
+### Blocker: minimal inner-expr dispatch
+- severity: cross-item
+- affects: parse-parenthesized-tuple-unit, parse-array-literal-expressions, parse-struct-literal-expressions, pratt-parser-for-binary-operators
+- question: Should this item add a private `parse_primary_for_paren` stub that dispatches to existing literal parsers (and later gets replaced), or wait for the Pratt driver to land first and only test with one literal kind?
+- default_assumption: Add the private stub now. It's ~15 lines, scoped to `expr.rs`, and lets subsequent aggregate-literal items (`array`, `struct-lit`) reuse the same internal entry point until the Pratt driver retires it. The verify command can then exercise all four paren shapes meaningfully.
+- Resolution: Accept default — temporary duplication with item 47's `parse_primary` stub is expected; item 49's "shared-stub unification" blocker handles the cleanup
+
+---
+
+
+## parse-unary-prefix-expressions
+- Item: Parse unary prefix expressions
+- Reason: blockers
+- Timestamp: 2026-04-27T04:46:40.6240204Z
+
+### Blocker: shared primary-expr dispatcher
+- severity: cross-item
+- affects: parse-unary-prefix-expressions, parse-parenthesized-tuple-unit, parse-array-literal-expressions, parse-struct-literal-expressions, pratt-parser-for-binary-operators
+- question: Should this item add its own private `parse_primary` stub, or wait for / extend the `parse_primary_for_paren` stub introduced by `parse-parenthesized-tuple-unit`?
+- default_assumption: Add a new `parse_primary` here. If `parse_primary_for_paren` already exists at execute-time, the executor may rename/share it; otherwise the two stubs can coexist briefly and a later item will unify them. Either path satisfies the verify gate.
+- Resolution: Accept default
+
+### Blocker: BitNot scope
+- severity: local
+- affects: parse-unary-prefix-expressions
+- question: Should `~` (BitNot) be parsed as a prefix here as well, given the `UnaryOp::BitNot` variant already exists?
+- default_assumption: No. The item lists only `-`, `not`, `*`, `&`, `&mut`. `BitNot` is left for a later item (or for the Pratt driver to wire in as part of operator coverage). The `~` Tilde token will produce the standard `Err` from the primary dispatcher until then.
+- Resolution: Accept default
+
+---
+
+
+## pratt-parser-for-binary-operators
+- Item: Pratt parser for binary operators
+- Reason: blockers
+- Timestamp: 2026-04-27T04:50:14.6646516Z
+
+### Blocker: paren-wrapped comparison strictness
+- severity: cross-item
+- affects: pratt-parser-for-binary-operators, parse-parenthesized-tuple-unit, ast-pretty-printer-in-src-ast-printer-rs
+- question: Should `(1 < 2) < 3` be accepted (rustc behavior) or rejected like `1 < 2 < 3` (literal spec line)?
+- default_assumption: Reject both, by checking whether `lhs` is any `Binary` whose `op` is a comparison. Matches the spec line as written. Loosening requires either an `Expr::Paren` wrapper or a "was the LHS produced inside parens" flag on the parser; both are out of scope here.
+- Resolution: Accept default — flagged for a future TODO if real code trips the strict rejection
+
+### Blocker: assignment and compound-assignment in the precedence table
+- severity: cross-item
+- affects: pratt-parser-for-binary-operators, parse-let-statements, parse-expression-statements-with-semicolon-significance
+- question: Should `=`, `+=`, `-=`, `*=`, `/=`, `%=` be added to the Pratt table here (right-assoc, looser than `or`)?
+- default_assumption: No. The item's bullet list ends at `or`; assignment is treated as a separate concern handled by statement-level parsing or a follow-up expression item. `binary_lbp` returns `None` for assignment tokens, so they fall out of expression parsing cleanly today.
+- Resolution: Accept default
+
+### Blocker: error code for chained comparisons
+- severity: local
+- affects: pratt-parser-for-binary-operators
+- question: Should chained comparisons use `E0100` (generic unexpected-token) or get a dedicated code?
+- default_assumption: Reuse `E0100` with the message `"comparison operators cannot be chained"` and `ErrorKind::Syntax`. Adding a dedicated code touches `error/mod.rs` and the explain subcommand and is out of scope for this item.
+- Resolution: Accept default
+
+---
+
+
+## parse-function-call-method-call-field-access
+- Item: Parse function call + method call + field access
+- Reason: blockers
+- Timestamp: 2026-04-27T04:54:09.6940244Z
+
+### Blocker: method-call turbofish scope
+- severity: cross-item
+- affects: parse-function-call-method-call-field-access, parse-path-types-with-generic-args, define-generics-and-whereclause-in-src-ast-generics-rs
+- question: Should `x.method::<T>(args)` parse turbofish into `MethodCall.generic_args` here, or be deferred to a later expression-parsing item?
+- default_assumption: Defer. The bullet line lists only `x.method(args)`; `MethodCall.generic_args` is set to `Vec::new()`. A later item can add the `Dot Ident ColonColon Lt …` lookahead without touching the `parse_postfix` shape.
+- Resolution: Accept default
+
+### Blocker: Ident dispatch ownership
+- severity: cross-item
+- affects: parse-function-call-method-call-field-access, parse-path-expressions, parse-unary-prefix-expressions, pratt-parser-for-binary-operators
+- question: Which item should add `Ident | SelfUpper | SelfLower → parse_path_expr` to `parse_primary`? `parse-path-expressions` does not, `parse-unary-prefix-expressions` does not, but without it `f()` is unreachable from `parse_unary_prefix`.
+- default_assumption: Add it here, as a one-line wiring step in `parse_primary`. This is the first item that actually *needs* identifier-headed primaries to verify its bullet, so co-locating the wiring is justified. If `parse-path-expressions` is later expanded to include the wiring, the duplicate arm is harmless.
+- Resolution: Accept default
+
+### Blocker: tuple-field idx width truncation
+- severity: local
+- affects: parse-function-call-method-call-field-access
+- question: Should `IntLiteral` values exceeding `u32::MAX` in a tuple-field position emit an error, or silently truncate?
+- default_assumption: Silent truncation via `as u32`. Tuple indices > u32 are not constructible in any sane source, and emitting a dedicated error code touches `error/mod.rs` and the explain table, which is out of scope for a pure parser item.
+- Resolution: Accept default
+
+### Blocker: shared-stub unification
+- severity: local
+- affects: parse-function-call-method-call-field-access, parse-parenthesized-tuple-unit, parse-unary-prefix-expressions
+- question: If both `parse_primary` and `parse_primary_for_paren` exist when this item lands, should they be collapsed?
+- default_assumption: Collapse them by renaming `parse_primary_for_paren` away and pointing `parse_paren_tuple_unit` at `parse_primary`. The verify gate doesn't require this, but it removes a known temporary duplicate. If collapse risks breaking a sibling test, leave both stubs and only wire postfix into `parse_primary`.
+- Resolution: Accept default
 
 ---
 

@@ -234,4 +234,30 @@ mod tests {
             Ok(()) => panic!("expected Err"),
         }
     }
+
+    #[test]
+    fn compile_error_builder_chains() {
+        let span = Span::new(FileId(0), 0, 1);
+        let err: CompileError =
+            CompileError::new(ErrorCode::E0001, ErrorKind::Lexical, span, "boom")
+                .with_suggestion(Suggestion {
+                    message: "try this".into(),
+                    replacement: None,
+                    span,
+                })
+                .with_suggestion(Suggestion {
+                    message: "try this".into(),
+                    replacement: None,
+                    span,
+                })
+                .with_note("aside")
+                .with_note("aside");
+
+        assert_eq!(err.code, ErrorCode::E0001);
+        assert_eq!(err.kind, ErrorKind::Lexical);
+        assert_eq!(err.span, span);
+        assert_eq!(err.message, "boom");
+        assert_eq!(err.suggestions.len(), 2);
+        assert_eq!(err.notes, vec!["aside", "aside"]);
+    }
 }

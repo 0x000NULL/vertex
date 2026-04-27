@@ -84,7 +84,7 @@
   - [ ] Fields: `message: String`, `replacement: Option<String>`, `span: Span`
   - [ ] **Verify:** `cargo build`; `grep -q 'pub struct Suggestion' src/error.rs`
 
-- [ ] Define `CompileError` struct in `src/error.rs`
+- [x] Define `CompileError` struct in `src/error.rs`
   - [ ] Fields: `code: ErrorCode`, `kind: ErrorKind`, `span: Span`, `message: String`, `suggestions: Vec<Suggestion>`, `notes: Vec<String>`
   - [ ] Methods: `pub fn new(code, kind, span, msg)`, `pub fn with_suggestion(self, s) -> Self`, `pub fn with_note(self, n) -> Self`
   - [ ] **Verify:** `cargo test --lib error::tests::compile_error_builder_chains`

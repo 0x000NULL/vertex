@@ -276,3 +276,74 @@
 ==> plan  parse-literal-expressions
       plan: 90.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-literal-expressions-plan-20260427T043835113.txt
 ==> exec  parse-literal-expressions
+      exec: 120.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-literal-expressions-execute-20260427T044035142.txt
+      notes: - The plan called for using "the parser's standard error path" without pushing to `self.errors`. I added a small private helper `unexpected_token_error(&self, expected: &str) -> CompileError` inside `expr.rs` (with a small local `describe_kind` for the "found" side) rather than reusing the existing `expect`/`expected_token_error` in `parser/mod.rs` because (a) `expect` matches by `mem::discriminant` which is awkward for "any int literal" patterns, and (b) `expected_token_error` pushes to `self.errors` and runs recovery, which the plan explicitly says these methods should not do. The error code (`E0100`) and `ErrorKind::Syntax` match `expect`'s convention as required. / - `new_node_id` is private (no `pub`); it is callable from the child `parser::expr` submodule via Rust's normal child-sees-parent-private-items rule. Verified by successful compile.
+    [44/113] parse-literal-expressions: plan $0.63 / execute $0.83 / verified / committed 154e9a9
+==> plan  parse-path-expressions
+      plan: 111.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-path-expressions-plan-20260427T044227539.txt
+    [45/113] parse-path-expressions: 1 cross-item, 1 local blockers -> needs-review
+        [cross-item] Should `parse_path` store `GenericArg::Placeholder` per turbofish arg today and let the generics item migrate them later, or wait until a real `GenericArg` enum exists?
+          default: Push one `GenericArg::Placeholder` per comma-separated arg now; the generics item will widen `GenericArg` and update consumers. Test asserts only `.len()`, not identity.
+        [local] Should `parse_path` accept `Self` and `self` keyword tokens as the head segment, or restrict heads to plain `Ident`?
+          default: Accept both `SelfUpper` and `SelfLower` as path heads (treating them as ident-equivalent segments named "Self"/"self"). Removable in one line if the verify test rejects it.
+==> plan  parse-parenthesized-tuple-unit
+      plan: 113.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-parenthesized-tuple-unit-plan-20260427T044420580.txt
+    [46/113] parse-parenthesized-tuple-unit: 2 cross-item, 0 local blockers -> needs-review
+        [cross-item] Should `(expr)` add a wrapper node (`Expr::Paren`) that preserves the parentheses for the pretty-printer, or be unwrapped to the inner `Expr`?
+          default: Unwrap to the inner expression (no `Paren` variant). Matches Rust's rustc/syn behavior. The pretty-printer can re-insert parens based on precedence.
+        [cross-item] Should this item add a private `parse_primary_for_paren` stub that dispatches to existing literal parsers (and later gets replaced), or wait for the Pratt driver to land first and only test with one literal kind?
+          default: Add the private stub now. It's ~15 lines, scoped to `expr.rs`, and lets subsequent aggregate-literal items (`array`, `struct-lit`) reuse the same internal entry point until the Pratt driver retires it. The verify command can then exercise all four paren shapes meaningfully.
+==> plan  parse-unary-prefix-expressions
+      plan: 140.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-unary-prefix-expressions-plan-20260427T044640611.txt
+    [47/113] parse-unary-prefix-expressions: 1 cross-item, 1 local blockers -> needs-review
+        [cross-item] Should this item add its own private `parse_primary` stub, or wait for / extend the `parse_primary_for_paren` stub introduced by `parse-parenthesized-tuple-unit`?
+          default: Add a new `parse_primary` here. If `parse_primary_for_paren` already exists at execute-time, the executor may rename/share it; otherwise the two stubs can coexist briefly and a later item will unify them. Either path satisfies the verify gate.
+        [local] Should `~` (BitNot) be parsed as a prefix here as well, given the `UnaryOp::BitNot` variant already exists?
+          default: No. The item lists only `-`, `not`, `*`, `&`, `&mut`. `BitNot` is left for a later item (or for the Pratt driver to wire in as part of operator coverage). The `~` Tilde token will produce the standard `Err` from the primary dispatcher until then.
+==> plan  pratt-parser-for-binary-operators
+      plan: 214.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\pratt-parser-for-binary-operators-plan-20260427T045014648.txt
+    [48/113] pratt-parser-for-binary-operators: 2 cross-item, 1 local blockers -> needs-review
+        [cross-item] Should `(1 < 2) < 3` be accepted (rustc behavior) or rejected like `1 < 2 < 3` (literal spec line)?
+          default: Reject both, by checking whether `lhs` is any `Binary` whose `op` is a comparison. Matches the spec line as written. Loosening requires either an `Expr::Paren` wrapper or a "was the LHS produced inside parens" flag on the parser; both are out of scope here.
+        [cross-item] Should `=`, `+=`, `-=`, `*=`, `/=`, `%=` be added to the Pratt table here (right-assoc, looser than `or`)?
+          default: No. The item's bullet list ends at `or`; assignment is treated as a separate concern handled by statement-level parsing or a follow-up expression item. `binary_lbp` returns `None` for assignment tokens, so they fall out of expression parsing cleanly today.
+        [local] Should chained comparisons use `E0100` (generic unexpected-token) or get a dedicated code?
+          default: Reuse `E0100` with the message `"comparison operators cannot be chained"` and `ErrorKind::Syntax`. Adding a dedicated code touches `error/mod.rs` and the explain subcommand and is out of scope for this item.
+==> plan  parse-function-call-method-call-field-access
+      plan: 235.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-function-call-method-call-field-access-plan-20260427T045409680.txt
+    [49/113] parse-function-call-method-call-field-access: 2 cross-item, 2 local blockers -> needs-review
+        [cross-item] Should `x.method::<T>(args)` parse turbofish into `MethodCall.generic_args` here, or be deferred to a later expression-parsing item?
+          default: Defer. The bullet line lists only `x.method(args)`; `MethodCall.generic_args` is set to `Vec::new()`. A later item can add the `Dot Ident ColonColon Lt …` lookahead without touching the `parse_postfix` shape.
+        [cross-item] Which item should add `Ident | SelfUpper | SelfLower → parse_path_expr` to `parse_primary`? `parse-path-expressions` does not, `parse-unary-prefix-expressions` does not, but without it `f()` is unreachable from `parse_unary_prefix`.
+          default: Add it here, as a one-line wiring step in `parse_primary`. This is the first item that actually *needs* identifier-headed primaries to verify its bullet, so co-locating the wiring is justified. If `parse-path-expressions` is later expanded to include the wiring, the duplicate arm is harmless.
+        [local] Should `IntLiteral` values exceeding `u32::MAX` in a tuple-field position emit an error, or silently truncate?
+          default: Silent truncation via `as u32`. Tuple indices > u32 are not constructible in any sane source, and emitting a dedicated error code touches `error/mod.rs` and the explain table, which is out of scope for a pure parser item.
+        [local] If both `parse_primary` and `parse_primary_for_paren` exist when this item lands, should they be collapsed?
+          default: Collapse them by renaming `parse_primary_for_paren` away and pointing `parse_paren_tuple_unit` at `parse_primary`. The verify gate doesn't require this, but it removes a known temporary duplicate. If collapse risks breaking a sibling test, leave both stubs and only wire postfix into `parse_primary`.
+==> plan  parse-indexing-cast-try
+[33;1mWARNING: Working tree is dirty. Runner will create commits interleaved with your uncommitted work. Consider 'git worktree add ../todo-run' first.[0m
+==> baseline check (1 flavor(s): rust)
+      [rust] build: cargo check --all-targets
+        build ok
+      [rust] test: cargo test --all-targets --no-fail-fast
+        tests ok
+      [rust] lint: cargo clippy --all-targets -- -D warnings
+        lint failed (exit 101)
+==> baseline failed in 1 stage(s); -AutoFixBaseline -> attempting repair
+    auto-fix attempt completed; re-running baseline to confirm
+==> baseline check (1 flavor(s): rust)
+      [rust] build: cargo check --all-targets
+        build ok
+      [rust] test: cargo test --all-targets --no-fail-fast
+        tests ok
+      [rust] lint: cargo clippy --all-targets -- -D warnings
+        lint ok
+    baseline green (build + tests + lint clean)
+      [define-stmt-enum-in-src-ast-stmt-rs] in needs-review; -RetryNeedsReview re-queuing with bumped budgets
+      [define-generics-and-whereclause-in-src-ast-generics-rs] in needs-review; -RetryNeedsReview re-queuing with bumped budgets
+      [parse-path-expressions] in needs-review; -RetryNeedsReview re-queuing with bumped budgets
+      [parse-parenthesized-tuple-unit] in needs-review; -RetryNeedsReview re-queuing with bumped budgets
+      [parse-unary-prefix-expressions] in needs-review; -RetryNeedsReview re-queuing with bumped budgets
+      [pratt-parser-for-binary-operators] in needs-review; -RetryNeedsReview re-queuing with bumped budgets
+      [parse-function-call-method-call-field-access] in needs-review; -RetryNeedsReview re-queuing with bumped budgets
+==> plan  define-compileerror-struct-in-src-error-rs

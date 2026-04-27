@@ -251,7 +251,7 @@ impl<'a> Scanner<'a> {
         }
 
         let dot_followed_by_digit =
-            self.peek_at(0) == Some(b'.') && self.peek_at(1).map_or(false, |b| b.is_ascii_digit());
+            self.peek_at(0) == Some(b'.') && self.peek_at(1).is_some_and(|b| b.is_ascii_digit());
         if !dot_followed_by_digit {
             self.pos = start;
             return None;
@@ -542,13 +542,8 @@ impl<'a> Scanner<'a> {
                     (TokenKind::Percent, 1)
                 }
             }
-            b'!' => {
-                if self.peek_at(1) == Some(b'=') {
-                    (TokenKind::BangEq, 2)
-                } else {
-                    return None;
-                }
-            }
+            b'!' if self.peek_at(1) == Some(b'=') => (TokenKind::BangEq, 2),
+            b'!' => return None,
             b':' => {
                 if self.peek_at(1) == Some(b':') {
                     (TokenKind::ColonColon, 2)
@@ -826,7 +821,7 @@ impl<'a> Scanner<'a> {
         if first == b'_' {
             let cont = self
                 .peek_at(1)
-                .map_or(false, |b| b.is_ascii_alphanumeric() || b == b'_');
+                .is_some_and(|b| b.is_ascii_alphanumeric() || b == b'_');
             if cont {
                 let lex_start = self.pos;
                 self.pos += 1;
@@ -1008,7 +1003,7 @@ mod tests {
             ("1.0", 1.0, FloatSuffix::Unsuffixed),
             ("1.0e10", 1.0e10, FloatSuffix::Unsuffixed),
             ("1.0E-3", 1.0e-3, FloatSuffix::Unsuffixed),
-            ("3.14f32", 3.14, FloatSuffix::F32),
+            ("1.5f32", 1.5, FloatSuffix::F32),
             ("2.5f64", 2.5, FloatSuffix::F64),
             ("1_000.000_5", 1000.0005, FloatSuffix::Unsuffixed),
             ("1.0e+2", 100.0, FloatSuffix::Unsuffixed),
@@ -2250,8 +2245,8 @@ mod tests {
         #[test]
         fn lit_float_simple() {
             lex_eq!(
-                "3.14",
-                vec![TokenKind::FloatLiteral(3.14, FloatSuffix::Unsuffixed)]
+                "1.5",
+                vec![TokenKind::FloatLiteral(1.5, FloatSuffix::Unsuffixed)]
             );
         }
 

@@ -92,7 +92,11 @@ impl Parser {
         } else {
             crate::span::Span::new(crate::span::FileId(0), 0, 0)
         };
-        let message = format!("expected {}, found {}", expected, describe_kind(self.peek()));
+        let message = format!(
+            "expected {}, found {}",
+            expected,
+            describe_kind(self.peek())
+        );
         CompileError::new(ErrorCode::E0100, ErrorKind::Syntax, span, message)
     }
 }
@@ -142,12 +146,12 @@ mod tests {
 
         // parse_float_lit
         let mut p = Parser::new(vec![
-            tok(TokenKind::FloatLiteral(3.14, FloatSuffix::F64)),
+            tok(TokenKind::FloatLiteral(1.5, FloatSuffix::F64)),
             tok(TokenKind::Eof),
         ]);
         match p.parse_float_lit() {
             Ok(Expr::FloatLit(lit)) => {
-                assert_eq!(lit.value, 3.14);
+                assert_eq!(lit.value, 1.5);
                 assert_eq!(lit.suffix, FloatSuffix::F64);
             }
             other => panic!("expected Ok(FloatLit), got {:?}", other),
@@ -156,10 +160,7 @@ mod tests {
         assert!(p.errors.is_empty());
 
         // parse_char_lit
-        let mut p = Parser::new(vec![
-            tok(TokenKind::CharLiteral('z')),
-            tok(TokenKind::Eof),
-        ]);
+        let mut p = Parser::new(vec![tok(TokenKind::CharLiteral('z')), tok(TokenKind::Eof)]);
         match p.parse_char_lit() {
             Ok(Expr::CharLit(lit)) => {
                 assert_eq!(lit.value, 'z');
