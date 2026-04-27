@@ -599,3 +599,5 @@
 ==> plan  parse-static-and-static-mut-items
       plan: 157.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-static-and-static-mut-items-plan-20260427T082610835.txt
 ==> exec  parse-static-and-static-mut-items
+      exec: 164.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-static-and-static-mut-items-execute-20260427T082854872.txt
+      notes: - The plan said to put the `lex_eq!("static", ...)` line "near the existing `lex_eq!("const", ...)` so the lexer test suite stays consistent." The existing `kw_*` tests follow alphabetical order (the same order as the keyword match arm). I placed `kw_static` between `kw_self_upper` and `kw_struct` to preserve that alphabetical grouping rather than literally adjacent to `kw_const`. Same convention applied to the keyword table entry. / - The plan did not anticipate that the exhaustive `describe` match in `src/parser/mod.rs` would force a new arm. I added `TokenKind::Static => "\`static\`"` (consistent with surrounding keyword arms) so the build would compile; this is the minimal change required.

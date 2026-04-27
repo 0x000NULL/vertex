@@ -510,7 +510,7 @@
   - [ ] `static NAME: T = expr;`, `static mut NAME: T = expr;`
   - [ ] **Verify:** `cargo test --lib parser::item::tests::static_item`
 
-- [ ] Parse type-alias items
+- [x] Parse type-alias items
   - [ ] `type Alias<T> = ConcreteTy;`
   - [ ] **Verify:** `cargo test --lib parser::item::tests::type_alias`
 

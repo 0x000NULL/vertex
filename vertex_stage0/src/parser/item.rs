@@ -2,8 +2,8 @@ use crate::ast::expr::{Expr, GenericArg, IntLit, Path, PathSegment};
 use crate::ast::generics::{Generics, TraitBound, TypeParam, WhereClause, WherePred};
 use crate::ast::item::{
     ConstDef, EnumDef, EnumVariant, Field, FnDef, Item, ModDef, ModKind, Param, StaticDef,
-    StructDef, StructKind, TraitDef, TraitItem, TraitItemConst, TraitItemFn, TraitItemType, UseDef,
-    UseTree, VariantKind,
+    StructDef, StructKind, TraitDef, TraitItem, TraitItemConst, TraitItemFn, TraitItemType,
+    TypeAliasDef, UseDef, UseTree, VariantKind,
 };
 use crate::ast::ty::Type;
 use crate::error::{CompileError, ErrorCode, ErrorKind};
@@ -1120,6 +1120,51 @@ impl Parser {
             ty,
             value,
             is_mut,
+        }))
+    }
+
+    pub fn parse_type_alias(&mut self) -> Result<Item, CompileError> {
+        let type_kw = self.expect(&TokenKind::Type)?;
+        let start_span = type_kw.span;
+
+        let name_tok = self.expect(&TokenKind::Ident(String::new()))?;
+        let name = match name_tok.kind {
+            TokenKind::Ident(s) => s,
+            _ => unreachable!(),
+        };
+
+        let mut generic_params: Vec<TypeParam> = Vec::new();
+        let mut generics_list_span: Option<Span> = None;
+        if matches!(self.peek(), TokenKind::Lt) {
+            let lt_span = self.tokens[self.pos].span;
+            let (params, gt_span) = self.parse_generics_params()?;
+            generic_params = params;
+            generics_list_span = Some(lt_span.merge(&gt_span));
+        }
+
+        self.expect(&TokenKind::Eq)?;
+        let ty = self.parse_type()?;
+        let semi_tok = self.expect(&TokenKind::Semi)?;
+        let end_span = semi_tok.span;
+
+        let generics = generics_list_span.map(|span| {
+            let id = self.new_node_id();
+            Generics {
+                id,
+                span,
+                params: generic_params,
+                where_clause: None,
+            }
+        });
+
+        let span = start_span.merge(&end_span);
+        let id = self.new_node_id();
+        Ok(Item::TypeAlias(TypeAliasDef {
+            id,
+            span,
+            name,
+            generics,
+            ty,
         }))
     }
 }
@@ -2318,6 +2363,53 @@ mod tests {
             other => panic!("expected Expr::IntLit, got {:?}", other),
         }
         assert!(s.is_mut);
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+    }
+
+    fn as_type_alias(item: Item) -> TypeAliasDef {
+        match item {
+            Item::TypeAlias(t) => t,
+            other => panic!("expected Item::TypeAlias, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn type_alias() {
+        // type Alias = i32;
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Type),
+            ident_tok("Alias"),
+            tok(TokenKind::Eq),
+            ident_tok("i32"),
+            tok(TokenKind::Semi),
+            tok(TokenKind::Eof),
+        ]);
+        let t = as_type_alias(p.parse_type_alias().expect("parse_type_alias"));
+        assert_eq!(t.name, "Alias");
+        assert!(t.generics.is_none());
+        assert_eq!(type_ident(&t.ty), "i32");
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // type Alias<T> = T;
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Type),
+            ident_tok("Alias"),
+            tok(TokenKind::Lt),
+            ident_tok("T"),
+            tok(TokenKind::Gt),
+            tok(TokenKind::Eq),
+            ident_tok("T"),
+            tok(TokenKind::Semi),
+            tok(TokenKind::Eof),
+        ]);
+        let t = as_type_alias(p.parse_type_alias().expect("parse_type_alias"));
+        assert_eq!(t.name, "Alias");
+        let g = t.generics.expect("expected generics");
+        assert_eq!(g.params.len(), 1);
+        assert_eq!(g.params[0].name, "T");
+        assert_eq!(type_ident(&t.ty), "T");
         assert!(p.errors.is_empty());
         assert!(matches!(p.peek(), TokenKind::Eof));
     }

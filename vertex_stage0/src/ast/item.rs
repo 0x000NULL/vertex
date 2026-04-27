@@ -210,6 +210,9 @@ pub struct StaticDef {
 pub struct TypeAliasDef {
     pub id: NodeId,
     pub span: Span,
+    pub name: String,
+    pub generics: Option<Generics>,
+    pub ty: Type,
 }
 
 #[allow(dead_code)]
