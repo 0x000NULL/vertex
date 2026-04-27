@@ -126,7 +126,7 @@
   - [ ] Define `IntSuffix` and `FloatSuffix` enums in same file (variants: `I8..I64, ISize, U8..U64, USize, Unsuffixed` and `F32, F64, Unsuffixed`)
   - [ ] **Verify:** `cargo build`; `grep -q 'IntLiteral' src/lexer/token.rs`
 
-- [ ] Add identifier and operator variants to `TokenKind`
+- [x] Add identifier and operator variants to `TokenKind`
   - [ ] `Ident(String)`
   - [ ] Operator variants: `Plus, Minus, Star, Slash, Percent, EqEq, BangEq, Lt, Gt, Le, Ge, Amp, Pipe, Caret, Tilde, Shl, Shr, Eq, PlusEq, MinusEq, StarEq, SlashEq, PercentEq`
   - [ ] Punctuation: `Dot, ColonColon, LBracket, RBracket, LParen, RParen, LBrace, RBrace, Question, DotDot, DotDotEq, Arrow, FatArrow, Semi, Comma, Colon, Underscore`

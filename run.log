@@ -62,3 +62,9 @@
 ==> exec  define-tokenkind-enum-in-src-lexer-token-rs-keyword-variants
       exec: 73.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-tokenkind-enum-in-src-lexer-token-rs-keyword-variants-execute-20260427T030719042.txt
       notes: - Used the literal 32-variant list from the plan verbatim (ignoring the prose's "29 keyword variants" count, as the plan instructed). / - Variant order in the file follows the plan's listed order exactly.
+    [8/113] define-tokenkind-enum-in-src-lexer-token-rs-keyword-variants: plan $0.40 / execute $0.30 / verified / committed ae00fb2
+==> plan  add-literal-variants-to-tokenkind
+      plan: 45.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-literal-variants-to-tokenkind-plan-20260427T030804848.txt
+==> exec  add-literal-variants-to-tokenkind
+      exec: 26.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-literal-variants-to-tokenkind-execute-20260427T030830894.txt
+      notes: - Placed `IntSuffix` and `FloatSuffix` above `TokenKind` in the file so the literal variants can reference them without a forward declaration concern (Rust allows it either way; ordering is purely stylistic, and top-down reading was the conservative choice).
