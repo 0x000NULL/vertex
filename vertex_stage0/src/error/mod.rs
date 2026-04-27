@@ -9,6 +9,13 @@ pub struct Suggestion {
     pub span: Span,
 }
 
+#[derive(Debug, Clone)]
+pub struct Label {
+    pub span: Span,
+    pub message: String,
+    pub primary: bool,
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct ErrorCode(pub u32);
 
@@ -33,6 +40,7 @@ pub struct CompileError {
     pub kind: ErrorKind,
     pub span: Span,
     pub message: String,
+    pub labels: Vec<Label>,
     pub suggestions: Vec<Suggestion>,
     pub notes: Vec<String>,
 }
@@ -44,9 +52,24 @@ impl CompileError {
             kind,
             span,
             message: message.into(),
+            labels: Vec::new(),
             suggestions: Vec::new(),
             notes: Vec::new(),
         }
+    }
+
+    pub fn with_label(mut self, label: Label) -> Self {
+        self.labels.push(label);
+        self
+    }
+
+    pub fn with_secondary_label(mut self, span: Span, message: impl Into<String>) -> Self {
+        self.labels.push(Label {
+            span,
+            message: message.into(),
+            primary: false,
+        });
+        self
     }
 
     pub fn with_suggestion(mut self, suggestion: Suggestion) -> Self {
