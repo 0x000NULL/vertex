@@ -1,4 +1,7 @@
-use crate::ast::{expr::Path, NodeId};
+use crate::ast::{
+    expr::{Path, PathSegment},
+    NodeId,
+};
 use crate::span::Span;
 
 #[allow(dead_code)]
@@ -26,6 +29,13 @@ pub enum Type {
     Fn {
         params: Vec<Type>,
         ret: Box<Type>,
+    },
+    QPath {
+        self_ty: Box<Type>,
+        trait_: Path,
+        segments: Vec<PathSegment>,
+        span: Span,
+        id: NodeId,
     },
     Infer,
 }

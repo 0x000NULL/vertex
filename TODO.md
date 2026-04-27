@@ -542,7 +542,7 @@
   - [ ] `fn(T, U) -> V`, `extern "C" fn(...)`
   - [ ] **Verify:** `cargo test --lib parser::ty::tests::fn_types`
 
-- [ ] Parse associated-type projection
+- [x] Parse associated-type projection
   - [ ] `<T as Iterator>::Item`
   - [ ] **Verify:** `cargo test --lib parser::ty::tests::assoc_projection`
 

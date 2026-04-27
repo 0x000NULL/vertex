@@ -7,6 +7,13 @@ use crate::span::{FileId, Span};
 
 impl Parser {
     pub fn parse_type(&mut self) -> Result<Type, CompileError> {
+        // A leading `<` at type position can only start a qualified path
+        // projection (`<T as Trait>::Item`). Generic-arg `<` always follows
+        // an ident and is handled by the path-type body, so there is no
+        // ambiguity at the *start* of `parse_type`.
+        if matches!(self.peek(), TokenKind::Lt) {
+            return self.parse_qpath_type();
+        }
         if matches!(self.peek(), TokenKind::Amp) {
             return self.parse_ref_type();
         }
@@ -171,6 +178,93 @@ impl Parser {
         })
     }
 
+    fn parse_qpath_type(&mut self) -> Result<Type, CompileError> {
+        debug_assert!(matches!(self.peek(), TokenKind::Lt));
+        let lt_tok = self.bump();
+        let start_span = lt_tok.span;
+
+        let self_ty = self.parse_type()?;
+
+        // The `as` keyword is lexed as `Ident("as")` today; mirrors the
+        // precedent in `parser/expr.rs` cast handling.
+        match self.peek() {
+            TokenKind::Ident(s) if s == "as" => {
+                self.bump();
+            }
+            _ => {
+                let err = CompileError::new(
+                    ErrorCode::E0100,
+                    ErrorKind::Syntax,
+                    start_span,
+                    "expected `as` in qualified path",
+                );
+                self.errors.push(err);
+                self.recover_to_sync();
+            }
+        }
+
+        let trait_body = self.parse_type()?;
+        let trait_ = match trait_body {
+            Type::Path(p) => p,
+            _ => {
+                let err = CompileError::new(
+                    ErrorCode::E0100,
+                    ErrorKind::Syntax,
+                    start_span,
+                    "expected trait path after `as`",
+                );
+                self.errors.push(err);
+                self.recover_to_sync();
+                Path {
+                    id: self.new_node_id(),
+                    span: start_span,
+                    segments: Vec::new(),
+                }
+            }
+        };
+
+        self.expect(&TokenKind::Gt)?;
+        self.expect(&TokenKind::ColonColon)?;
+
+        let mut segments: Vec<PathSegment> = Vec::new();
+        let first_tok = self.expect(&TokenKind::Ident(String::new()))?;
+        let mut last_span = first_tok.span;
+        let first_ident = match first_tok.kind {
+            TokenKind::Ident(s) => s,
+            _ => unreachable!(),
+        };
+        segments.push(PathSegment {
+            ident: first_ident,
+            generic_args: Vec::new(),
+        });
+
+        while matches!(self.peek(), TokenKind::ColonColon)
+            && matches!(self.peek_at(1), TokenKind::Ident(_))
+        {
+            self.bump();
+            let seg_tok = self.bump();
+            last_span = seg_tok.span;
+            let ident = match seg_tok.kind {
+                TokenKind::Ident(s) => s,
+                _ => unreachable!(),
+            };
+            segments.push(PathSegment {
+                ident,
+                generic_args: Vec::new(),
+            });
+        }
+
+        let span = start_span.merge(&last_span);
+        let id = self.new_node_id();
+        Ok(Type::QPath {
+            self_ty: Box::new(self_ty),
+            trait_,
+            segments,
+            span,
+            id,
+        })
+    }
+
     fn parse_ref_type(&mut self) -> Result<Type, CompileError> {
         debug_assert!(matches!(self.peek(), TokenKind::Amp));
         let amp_tok = self.bump();
@@ -225,6 +319,7 @@ fn type_span(ty: &Type) -> Span {
                 type_span(ret)
             }
         }
+        Type::QPath { span, .. } => *span,
         _ => unreachable!("type_span: unexpected variant from stopgap parse_type"),
     }
 }
@@ -591,6 +686,41 @@ mod tests {
                 assert_path_ident(&ret, "i32");
             }
             other => panic!("expected Type::Fn, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+    }
+
+    #[test]
+    fn assoc_projection() {
+        // <T as Iterator>::Item
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Lt),
+            ident_tok("T"),
+            ident_tok("as"),
+            ident_tok("Iterator"),
+            tok(TokenKind::Gt),
+            tok(TokenKind::ColonColon),
+            ident_tok("Item"),
+            tok(TokenKind::Eof),
+        ]);
+        let ty = p.parse_type().expect("parse_type <T as Iterator>::Item");
+        match ty {
+            Type::QPath {
+                self_ty,
+                trait_,
+                segments,
+                ..
+            } => {
+                assert_path_ident(&self_ty, "T");
+                assert_eq!(trait_.segments.len(), 1);
+                assert_eq!(trait_.segments[0].ident, "Iterator");
+                assert!(trait_.segments[0].generic_args.is_empty());
+                assert_eq!(segments.len(), 1);
+                assert_eq!(segments[0].ident, "Item");
+                assert!(segments[0].generic_args.is_empty());
+            }
+            other => panic!("expected Type::QPath, got {:?}", other),
         }
         assert!(p.errors.is_empty());
         assert!(matches!(p.peek(), TokenKind::Eof));
