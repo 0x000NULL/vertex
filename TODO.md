@@ -187,7 +187,7 @@
   - [ ] Define `DocStyle` enum in `token.rs`: `Outer, Inner`
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::doc_comments_preserved`
 
-- [ ] Implement operator scanning with maximal munch
+- [x] Implement operator scanning with maximal munch
   - [ ] Method `Scanner::scan_operator`
   - [ ] Order: `..=` before `..` before `.`; `<<=` before `<<` before `<`; `==` before `=`; `>=` before `>`; etc.
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::operator_maximal_munch`

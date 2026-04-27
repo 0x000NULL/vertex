@@ -1,6 +1,7 @@
 use crate::lexer::token::DocStyle;
 use crate::lexer::token::FloatSuffix;
 use crate::lexer::token::IntSuffix;
+use crate::lexer::token::TokenKind;
 use crate::span::FileId;
 use crate::span::Span;
 
@@ -449,6 +450,118 @@ impl<'a> Scanner<'a> {
                 }
             }
         }
+    }
+
+    pub fn scan_operator(&mut self) -> Option<(TokenKind, Span)> {
+        let start = self.pos as u32;
+        let first = self.peek()?;
+
+        let (kind, len) = match first {
+            b'.' => {
+                if self.peek_at(1) == Some(b'.') && self.peek_at(2) == Some(b'=') {
+                    (TokenKind::DotDotEq, 3)
+                } else if self.peek_at(1) == Some(b'.') {
+                    (TokenKind::DotDot, 2)
+                } else {
+                    (TokenKind::Dot, 1)
+                }
+            }
+            b'<' => {
+                if self.peek_at(1) == Some(b'=') {
+                    (TokenKind::Le, 2)
+                } else if self.peek_at(1) == Some(b'<') {
+                    (TokenKind::Shl, 2)
+                } else {
+                    (TokenKind::Lt, 1)
+                }
+            }
+            b'>' => {
+                if self.peek_at(1) == Some(b'=') {
+                    (TokenKind::Ge, 2)
+                } else if self.peek_at(1) == Some(b'>') {
+                    (TokenKind::Shr, 2)
+                } else {
+                    (TokenKind::Gt, 1)
+                }
+            }
+            b'=' => {
+                if self.peek_at(1) == Some(b'=') {
+                    (TokenKind::EqEq, 2)
+                } else if self.peek_at(1) == Some(b'>') {
+                    (TokenKind::FatArrow, 2)
+                } else {
+                    (TokenKind::Eq, 1)
+                }
+            }
+            b'-' => {
+                if self.peek_at(1) == Some(b'=') {
+                    (TokenKind::MinusEq, 2)
+                } else if self.peek_at(1) == Some(b'>') {
+                    (TokenKind::Arrow, 2)
+                } else {
+                    (TokenKind::Minus, 1)
+                }
+            }
+            b'+' => {
+                if self.peek_at(1) == Some(b'=') {
+                    (TokenKind::PlusEq, 2)
+                } else {
+                    (TokenKind::Plus, 1)
+                }
+            }
+            b'*' => {
+                if self.peek_at(1) == Some(b'=') {
+                    (TokenKind::StarEq, 2)
+                } else {
+                    (TokenKind::Star, 1)
+                }
+            }
+            b'/' => {
+                if self.peek_at(1) == Some(b'=') {
+                    (TokenKind::SlashEq, 2)
+                } else {
+                    (TokenKind::Slash, 1)
+                }
+            }
+            b'%' => {
+                if self.peek_at(1) == Some(b'=') {
+                    (TokenKind::PercentEq, 2)
+                } else {
+                    (TokenKind::Percent, 1)
+                }
+            }
+            b'!' => {
+                if self.peek_at(1) == Some(b'=') {
+                    (TokenKind::BangEq, 2)
+                } else {
+                    return None;
+                }
+            }
+            b':' => {
+                if self.peek_at(1) == Some(b':') {
+                    (TokenKind::ColonColon, 2)
+                } else {
+                    (TokenKind::Colon, 1)
+                }
+            }
+            b'&' => (TokenKind::Amp, 1),
+            b'|' => (TokenKind::Pipe, 1),
+            b'^' => (TokenKind::Caret, 1),
+            b'~' => (TokenKind::Tilde, 1),
+            b'(' => (TokenKind::LParen, 1),
+            b')' => (TokenKind::RParen, 1),
+            b'[' => (TokenKind::LBracket, 1),
+            b']' => (TokenKind::RBracket, 1),
+            b'{' => (TokenKind::LBrace, 1),
+            b'}' => (TokenKind::RBrace, 1),
+            b'?' => (TokenKind::Question, 1),
+            b';' => (TokenKind::Semi, 1),
+            b',' => (TokenKind::Comma, 1),
+            _ => return None,
+        };
+
+        self.pos += len;
+        Some((kind, Span::new(self.file_id, start, self.pos as u32)))
     }
 
     pub fn scan_doc_comment(&mut self) -> Option<(String, DocStyle, Span)> {
@@ -981,6 +1094,80 @@ mod tests {
             let mut s = Scanner::new(input, FileId(0));
             assert!(
                 s.scan_doc_comment().is_none(),
+                "expected None for {:?}",
+                input
+            );
+            assert_eq!(s.pos, 0, "expected pos=0 after rejecting {:?}", input);
+        }
+    }
+
+    #[test]
+    fn operator_maximal_munch() {
+        let cases: &[(&str, TokenKind, usize)] = &[
+            ("..=", TokenKind::DotDotEq, 3),
+            ("..", TokenKind::DotDot, 2),
+            (".", TokenKind::Dot, 1),
+            ("<=", TokenKind::Le, 2),
+            ("<<", TokenKind::Shl, 2),
+            ("<", TokenKind::Lt, 1),
+            (">=", TokenKind::Ge, 2),
+            (">>", TokenKind::Shr, 2),
+            (">", TokenKind::Gt, 1),
+            ("==", TokenKind::EqEq, 2),
+            ("=>", TokenKind::FatArrow, 2),
+            ("=", TokenKind::Eq, 1),
+            ("-=", TokenKind::MinusEq, 2),
+            ("->", TokenKind::Arrow, 2),
+            ("-", TokenKind::Minus, 1),
+            ("::", TokenKind::ColonColon, 2),
+            (":", TokenKind::Colon, 1),
+            ("!=", TokenKind::BangEq, 2),
+            ("+=", TokenKind::PlusEq, 2),
+            ("+", TokenKind::Plus, 1),
+            ("*=", TokenKind::StarEq, 2),
+            ("*", TokenKind::Star, 1),
+            ("/=", TokenKind::SlashEq, 2),
+            ("/", TokenKind::Slash, 1),
+            ("%=", TokenKind::PercentEq, 2),
+            ("%", TokenKind::Percent, 1),
+            ("&", TokenKind::Amp, 1),
+            ("|", TokenKind::Pipe, 1),
+            ("^", TokenKind::Caret, 1),
+            ("~", TokenKind::Tilde, 1),
+            ("?", TokenKind::Question, 1),
+            (";", TokenKind::Semi, 1),
+            (",", TokenKind::Comma, 1),
+            ("(", TokenKind::LParen, 1),
+            (")", TokenKind::RParen, 1),
+            ("[", TokenKind::LBracket, 1),
+            ("]", TokenKind::RBracket, 1),
+            ("{", TokenKind::LBrace, 1),
+            ("}", TokenKind::RBrace, 1),
+            ("..=x", TokenKind::DotDotEq, 3),
+            ("..x", TokenKind::DotDot, 2),
+            (".x", TokenKind::Dot, 1),
+        ];
+
+        for (input, expected_kind, expected_len) in cases {
+            let mut s = Scanner::new(input, FileId(31));
+            let (kind, span) = s.scan_operator().expect(input);
+            assert_eq!(&kind, expected_kind, "kind for {:?}", input);
+            assert_eq!(span.file_id, FileId(31), "file_id for {:?}", input);
+            assert_eq!(span.start, 0, "span.start for {:?}", input);
+            assert_eq!(
+                span.end as usize,
+                *expected_len,
+                "span.end for {:?}",
+                input
+            );
+            assert_eq!(s.pos, *expected_len, "pos for {:?}", input);
+        }
+
+        let rejections: &[&str] = &["a", "_", "#", "@", "$", "", "!"];
+        for input in rejections {
+            let mut s = Scanner::new(input, FileId(31));
+            assert!(
+                s.scan_operator().is_none(),
                 "expected None for {:?}",
                 input
             );

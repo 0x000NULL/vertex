@@ -132,3 +132,7 @@
 ==> plan  implement-doc-comment-scanning
       plan: 69.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-doc-comment-scanning-plan-20260427T033222982.txt
 ==> exec  implement-doc-comment-scanning
+      exec: 88.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-doc-comment-scanning-execute-20260427T033351022.txt
+      notes: - **`////` handling**: I followed the plan's "match `///` literally" guidance — `////` and longer slash runs are recognized as outer doc comments since the spec grammar `///` literally matches them. The plan listed `////` as a *rejection* candidate in step 5 ("yield `None`") but also stated in Risks/Assumptions that they should be emitted as outer doc. I resolved this contradiction conservatively in favor of the more authoritative Assumptions block, which explicitly says "treated as an outer doc comment." Therefore `////` is NOT in my rejection set; my rejection set is `// regular\n`, `//\n`, `/* block */`, `abc`, `/`, and empty string. / - **Empty input rejection**: included `""` in rejections to ensure `scan_doc_comment` handles EOF-at-start cleanly without panic, since the plan didn't enumerate this case.
+    [20/113] implement-doc-comment-scanning: plan $0.53 / execute $0.77 / verified / committed 9990a4d
+==> plan  implement-operator-scanning-with-maximal-munch
