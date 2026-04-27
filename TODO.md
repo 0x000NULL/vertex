@@ -371,7 +371,7 @@
   - [ ] Non-block branches not allowed (must be `{ ... }`)
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::if_else_chain`
 
-- [ ] Parse loop / while / for expressions
+- [x] Parse loop / while / for expressions
   - [ ] `loop { body }`, `while cond { body }`, `for pat in iter { body }`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::loop_while_for`
 

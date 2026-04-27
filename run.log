@@ -432,3 +432,11 @@
       notes: - Imported `Stmt` via `use crate::ast::stmt::Stmt;` rather than re-exporting through the top-level `crate::ast` re-export — both work; chose the more specific path to match the file's existing `crate::ast::expr::*` and `crate::lexer::token::TokenKind` import style. / - The test's `stmts[i]` matching uses `&b.stmts[0]` / `match &b.stmts[i]` (borrow) so that subsequent index accesses still see a populated `Vec`; `int_value` already takes `&Expr`, so this fits without cloning.
     [14/72] parse-block-expressions: plan $1.14 / execute $1.27 / verified / committed c4727cf
 ==> plan  parse-if-else-expressions
+      plan: 77.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-if-else-expressions-plan-20260427T061809659.txt
+==> exec  parse-if-else-expressions
+      exec: 139.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-if-else-expressions-execute-20260427T062028709.txt
+      notes: - Computed `Expr::If`'s span as `start_span.merge(&end_span)` where `end_span` is the else branch's span if present, otherwise the then-block's span. The plan said `last_branch.span()`, which matches this interpretation (the last branch present is either `else_branch` or `then`). / - Used `true`/`false` for conditions and a single integer literal as block tail, per the plan's note about avoiding ident-head plumbing.
+    [15/72] parse-if-else-expressions: plan $0.55 / execute $1.11 / verified / committed dc9a701
+==> plan  parse-loop-while-for-expressions
+      plan: 118.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-loop-while-for-expressions-plan-20260427T062228135.txt
+==> exec  parse-loop-while-for-expressions

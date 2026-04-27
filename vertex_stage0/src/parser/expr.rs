@@ -1,7 +1,7 @@
 use crate::ast::expr::{
     ArrayLit, ArrayRepeat, Binary, BinaryOp, Block, BoolLit, Call, Cast, CastTy, CharLit, Closure,
-    ClosureParam, Expr, FieldAccess, FloatLit, If, Index, IntLit, MethodCall, Range, StrLit, Try,
-    TupleFieldAccess, TupleLit, Unary, UnaryOp,
+    ClosureParam, Expr, FieldAccess, FloatLit, For, If, Index, IntLit, Loop, MethodCall, Pat, Range,
+    StrLit, Try, TupleFieldAccess, TupleLit, Unary, UnaryOp, While,
 };
 use crate::ast::stmt::Stmt;
 use crate::error::{CompileError, ErrorCode, ErrorKind};
@@ -331,6 +331,66 @@ impl Parser {
             cond: Box::new(cond),
             then: Box::new(then),
             else_branch,
+        }))
+    }
+
+    fn parse_loop(&mut self) -> Result<Expr, CompileError> {
+        let loop_tok = self.expect(&TokenKind::Loop)?;
+        let start_span = loop_tok.span;
+        let body = self.parse_block()?;
+        let span = start_span.merge(&body.span());
+        let id = self.new_node_id();
+        Ok(Expr::Loop(Loop {
+            id,
+            span,
+            body: Box::new(body),
+        }))
+    }
+
+    fn parse_while(&mut self) -> Result<Expr, CompileError> {
+        // TODO: once struct-literal heads land, the cond will need a
+        // "no-struct-literal" expression context so `while p { ... }` does
+        // not consume the brace as a struct-literal body.
+        let while_tok = self.expect(&TokenKind::While)?;
+        let start_span = while_tok.span;
+        let cond = self.parse_expr()?;
+        let body = self.parse_block()?;
+        let span = start_span.merge(&body.span());
+        let id = self.new_node_id();
+        Ok(Expr::While(While {
+            id,
+            span,
+            cond: Box::new(cond),
+            body: Box::new(body),
+        }))
+    }
+
+    fn parse_for(&mut self) -> Result<Expr, CompileError> {
+        // TODO: once struct-literal heads land, the iter will need a
+        // "no-struct-literal" expression context so `for x in it { ... }`
+        // does not consume the brace as a struct-literal body. The pattern
+        // slot is also a stub: only a single bare identifier is accepted,
+        // matching the closure-param stub. Richer patterns arrive in later
+        // items.
+        let for_tok = self.expect(&TokenKind::For)?;
+        let start_span = for_tok.span;
+        match self.peek() {
+            TokenKind::Ident(_) => {
+                self.bump();
+            }
+            _ => return Err(self.unexpected_token_error("identifier")),
+        }
+        self.expect(&TokenKind::In)?;
+        let iter = self.parse_expr()?;
+        let body = self.parse_block()?;
+        let span = start_span.merge(&body.span());
+        let id = self.new_node_id();
+        Ok(Expr::For(For {
+            id,
+            span,
+            pat: Pat::Placeholder,
+            iter: Box::new(iter),
+            body: Box::new(body),
         }))
     }
 
@@ -690,6 +750,9 @@ impl Parser {
             TokenKind::LBracket => self.parse_array_literal(),
             TokenKind::LBrace => self.parse_block(),
             TokenKind::If => self.parse_if(),
+            TokenKind::Loop => self.parse_loop(),
+            TokenKind::While => self.parse_while(),
+            TokenKind::For => self.parse_for(),
             _ => Err(self.unexpected_token_error("expression")),
         }
     }
@@ -2274,6 +2337,130 @@ mod tests {
             tok(TokenKind::Eof),
         ]);
         assert!(p.parse_expr().is_err());
+    }
+
+    #[test]
+    fn loop_while_for() {
+        use crate::ast::expr::Pat;
+
+        // loop { 1i32 } → Expr::Loop with Block tail = IntLit(1)
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Loop),
+            tok(TokenKind::LBrace),
+            int_tok(1),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Loop(e)) => match &*e.body {
+                Expr::Block(b) => {
+                    let tail = b.tail.as_ref().expect("tail");
+                    assert_eq!(int_value(tail), 1);
+                }
+                other => panic!("expected Block body, got {:?}", other),
+            },
+            other => panic!("expected Loop for `loop {{ 1 }}`, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+
+        // while true { 1i32 } → Expr::While with BoolLit(true) cond and Block body
+        let mut p = Parser::new(vec![
+            tok(TokenKind::While),
+            tok(TokenKind::True),
+            tok(TokenKind::LBrace),
+            int_tok(1),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::While(e)) => {
+                match &*e.cond {
+                    Expr::BoolLit(b) => assert!(b.value),
+                    other => panic!("expected BoolLit cond, got {:?}", other),
+                }
+                match &*e.body {
+                    Expr::Block(b) => {
+                        let tail = b.tail.as_ref().expect("tail");
+                        assert_eq!(int_value(tail), 1);
+                    }
+                    other => panic!("expected Block body, got {:?}", other),
+                }
+            }
+            other => panic!("expected While for `while true {{ 1 }}`, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+
+        // for x in 1i32..10i32 { 2i32 }
+        // → Expr::For with Pat::Placeholder, Range iter, Block body
+        let mut p = Parser::new(vec![
+            tok(TokenKind::For),
+            tok(TokenKind::Ident("x".to_string())),
+            tok(TokenKind::In),
+            int_tok(1),
+            tok(TokenKind::DotDot),
+            int_tok(10),
+            tok(TokenKind::LBrace),
+            int_tok(2),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::For(e)) => {
+                assert!(matches!(e.pat, Pat::Placeholder));
+                match &*e.iter {
+                    Expr::Range(r) => {
+                        let s = r.start.as_ref().expect("range start");
+                        let en = r.end.as_ref().expect("range end");
+                        assert_eq!(int_value(s), 1);
+                        assert_eq!(int_value(en), 10);
+                        assert!(!r.inclusive);
+                    }
+                    other => panic!("expected Range iter, got {:?}", other),
+                }
+                match &*e.body {
+                    Expr::Block(b) => {
+                        let tail = b.tail.as_ref().expect("tail");
+                        assert_eq!(int_value(tail), 2);
+                    }
+                    other => panic!("expected Block body, got {:?}", other),
+                }
+            }
+            other => panic!("expected For for `for x in 1..10 {{ 2 }}`, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+
+        // Error: for x 1i32 { 2i32 } (missing `in`) → E0100
+        let mut p = Parser::new(vec![
+            tok(TokenKind::For),
+            tok(TokenKind::Ident("x".to_string())),
+            int_tok(1),
+            tok(TokenKind::LBrace),
+            int_tok(2),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Err(e) => assert_eq!(e.code, ErrorCode::E0100),
+            Ok(other) => panic!(
+                "expected Err with E0100 for `for x 1 {{ 2 }}`, got Ok({:?})",
+                other
+            ),
+        }
+
+        // Error: while true 1i32 (non-block body) → E0100
+        let mut p = Parser::new(vec![
+            tok(TokenKind::While),
+            tok(TokenKind::True),
+            int_tok(1),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Err(e) => assert_eq!(e.code, ErrorCode::E0100),
+            Ok(other) => panic!(
+                "expected Err with E0100 for `while true 1`, got Ok({:?})",
+                other
+            ),
+        }
     }
 
     #[test]
