@@ -40,7 +40,7 @@
   - [ ] `tests/integration/smoke.rs` containing `#[test] fn crate_runs() { vertex_stage0::run(); }`
   - [ ] **Verify:** `cargo test --test smoke crate_runs`
 
-- [ ] Add CI workflow
+- [x] Add CI workflow
   - [ ] `.github/workflows/ci.yml` running `cargo build`, `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check`
   - [ ] **Verify:** `test -f .github/workflows/ci.yml`; `grep -q 'cargo clippy' .github/workflows/ci.yml`
 
