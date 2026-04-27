@@ -172,7 +172,7 @@
   - [ ] Same escape set as chars; allow embedded newlines
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::string_literal_escapes`
 
-- [ ] Implement raw string literal scanning
+- [x] Implement raw string literal scanning
   - [ ] Method `Scanner::scan_raw_string` handling `r"..."` and `r#"..."#` with arbitrary `#` count
   - [ ] Reject mismatched `#` counts; preserve content verbatim
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::raw_string_arbitrary_hashes`

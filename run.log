@@ -114,3 +114,5 @@
 ==> plan  implement-string-literal-scanning-regular
       plan: 57.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-string-literal-scanning-regular-plan-20260427T032445895.txt
 ==> exec  implement-string-literal-scanning-regular
+      exec: 107.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-string-literal-scanning-regular-execute-20260427T032632958.txt
+      notes: - Renamed `scan_char_escape` to `scan_escape_char` per the plan's suggested name; preserved its exact behavior (entry at `\`, advances past the sequence, leaves `pos` wherever it ended on failure so callers rewind to their saved start). / - Consolidated the two duplicate "missing close" rejection cases from the plan (`"abc` and `"\"abc"` typed-as-`"abc`) into a single `"abc` rejection input — they describe identical input. Other rejections remain distinct.

@@ -347,6 +347,66 @@ impl<'a> Scanner<'a> {
         }
     }
 
+    pub fn scan_raw_string(&mut self) -> Option<(String, Span)> {
+        if self.peek() != Some(b'r') {
+            return None;
+        }
+        let start = self.pos;
+        self.pos += 1;
+
+        let mut hash_count: usize = 0;
+        while self.peek() == Some(b'#') {
+            hash_count += 1;
+            self.pos += 1;
+        }
+
+        if self.peek() != Some(b'"') {
+            self.pos = start;
+            return None;
+        }
+        self.pos += 1;
+        let content_start = self.pos;
+
+        loop {
+            match self.peek() {
+                None => {
+                    self.pos = start;
+                    return None;
+                }
+                Some(b'"') => {
+                    let mut all_match = true;
+                    for i in 0..hash_count {
+                        if self.peek_at(1 + i) != Some(b'#') {
+                            all_match = false;
+                            break;
+                        }
+                    }
+                    if all_match {
+                        let content_end = self.pos;
+                        self.pos += 1 + hash_count;
+                        let content = String::from(&self.src[content_start..content_end]);
+                        let span = Span::new(self.file_id, start as u32, self.pos as u32);
+                        return Some((content, span));
+                    } else {
+                        self.pos += 1;
+                    }
+                }
+                Some(_) => {
+                    let rest = &self.src[self.pos..];
+                    match rest.chars().next() {
+                        Some(c) => {
+                            self.pos += c.len_utf8();
+                        }
+                        None => {
+                            self.pos = start;
+                            return None;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn scan_escape_char(&mut self) -> Option<char> {
         self.pos += 1;
         let kind = self.bump()?;
@@ -710,6 +770,49 @@ mod tests {
         let mut not_string = Scanner::new("abc", FileId(0));
         assert!(not_string.scan_string().is_none());
         assert_eq!(not_string.pos, 0);
+    }
+
+    #[test]
+    fn raw_string_arbitrary_hashes() {
+        let happy: &[(&str, &str)] = &[
+            ("r\"\"", ""),
+            ("r\"hello\"", "hello"),
+            ("r#\"a\"b\"#", "a\"b"),
+            ("r##\"x\"#y\"##", "x\"#y"),
+            ("r###\"contains \"## inside\"###", "contains \"## inside"),
+            ("r\"\\n\"", "\\n"),
+            ("r\"line1\\nline2\"", "line1\\nline2"),
+            ("r\"a\nb\"", "a\nb"),
+        ];
+
+        for (input, expected) in happy {
+            let mut s = Scanner::new(input, FileId(13));
+            let (value, span) = s.scan_raw_string().expect(input);
+            assert_eq!(value, *expected, "value for {:?}", input);
+            assert_eq!(span.file_id, FileId(13), "file_id for {:?}", input);
+            assert_eq!(span.start, 0, "span.start for {:?}", input);
+            assert_eq!(span.end as usize, input.len(), "span.end for {:?}", input);
+            assert_eq!(s.pos, input.len(), "pos for {:?}", input);
+        }
+
+        let rejections: &[&str] = &[
+            "r",
+            "r#",
+            "r\"abc",
+            "r#\"abc\"",
+            "r##\"abc\"#",
+            "abc",
+        ];
+
+        for input in rejections {
+            let mut s = Scanner::new(input, FileId(0));
+            assert!(
+                s.scan_raw_string().is_none(),
+                "expected None for {:?}",
+                input
+            );
+            assert_eq!(s.pos, 0, "expected pos=0 after rejecting {:?}", input);
+        }
     }
 
     #[test]
