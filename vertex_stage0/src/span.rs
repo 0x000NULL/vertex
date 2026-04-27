@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct FileId(pub u32);
@@ -45,11 +45,7 @@ impl SourceMap {
         SourceMap { files: Vec::new() }
     }
 
-    pub fn add_file(
-        &mut self,
-        name: impl Into<PathBuf>,
-        content: impl Into<String>,
-    ) -> FileId {
+    pub fn add_file(&mut self, name: impl Into<PathBuf>, content: impl Into<String>) -> FileId {
         let id = FileId(self.files.len() as u32);
         let content = content.into();
         let line_starts = compute_line_starts(&content);
