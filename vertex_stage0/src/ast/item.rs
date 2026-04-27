@@ -43,12 +43,21 @@ pub struct Field {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
+pub enum StructKind {
+    Record,
+    Tuple,
+    Unit,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub struct StructDef {
     pub id: NodeId,
     pub span: Span,
     pub name: String,
     pub generics: Option<Generics>,
     pub fields: Vec<Field>,
+    pub kind: StructKind,
 }
 
 #[allow(dead_code)]

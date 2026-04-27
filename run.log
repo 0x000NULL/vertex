@@ -538,3 +538,7 @@
 ==> plan  parse-normal-struct-items
       plan: 149.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-normal-struct-items-plan-20260427T074513406.txt
 ==> exec  parse-normal-struct-items
+      exec: 88.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-normal-struct-items-execute-20260427T074641437.txt
+      notes: - None — the plan was unambiguous and all interpretations matched the existing patterns (mirrored `parse_fn`'s generics handling, `Param`-style `Field` shape, and `tok`/`ident_tok`-based test layout).
+    [32/72] parse-normal-struct-items: plan $1.24 / execute $0.85 / verified / committed 0020c90
+==> plan  parse-tuple-unit-struct-items

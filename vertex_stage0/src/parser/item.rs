@@ -1,6 +1,6 @@
 use crate::ast::expr::{Expr, GenericArg, Path, PathSegment};
 use crate::ast::generics::{Generics, TraitBound, TypeParam, WhereClause, WherePred};
-use crate::ast::item::{Field, FnDef, Item, Param, StructDef};
+use crate::ast::item::{Field, FnDef, Item, Param, StructDef, StructKind};
 use crate::ast::ty::Type;
 use crate::error::{CompileError, ErrorCode, ErrorKind};
 use crate::lexer::token::TokenKind;
@@ -461,33 +461,88 @@ impl Parser {
             generics_list_span = Some(lt_span.merge(&gt_span));
         }
 
-        self.expect(&TokenKind::LBrace)?;
         let mut fields: Vec<Field> = Vec::new();
-        while !matches!(self.peek(), TokenKind::RBrace) {
-            let is_pub = self.eat(&TokenKind::Pub);
-            let fname_tok = self.expect(&TokenKind::Ident(String::new()))?;
-            let fname_span = fname_tok.span;
-            let fname = match fname_tok.kind {
-                TokenKind::Ident(s) => s,
-                _ => unreachable!(),
-            };
-            self.expect(&TokenKind::Colon)?;
-            let fty = self.parse_type()?;
-            let fspan = fname_span.merge(&type_span(&fty));
-            let fid = self.new_node_id();
-            fields.push(Field {
-                id: fid,
-                span: fspan,
-                name: fname,
-                ty: fty,
-                is_pub,
-            });
-            if !self.eat(&TokenKind::Comma) {
-                break;
+        let kind: StructKind;
+        let end_span: Span;
+        match self.peek() {
+            TokenKind::LBrace => {
+                self.bump();
+                while !matches!(self.peek(), TokenKind::RBrace) {
+                    let is_pub = self.eat(&TokenKind::Pub);
+                    let fname_tok = self.expect(&TokenKind::Ident(String::new()))?;
+                    let fname_span = fname_tok.span;
+                    let fname = match fname_tok.kind {
+                        TokenKind::Ident(s) => s,
+                        _ => unreachable!(),
+                    };
+                    self.expect(&TokenKind::Colon)?;
+                    let fty = self.parse_type()?;
+                    let fspan = fname_span.merge(&type_span(&fty));
+                    let fid = self.new_node_id();
+                    fields.push(Field {
+                        id: fid,
+                        span: fspan,
+                        name: fname,
+                        ty: fty,
+                        is_pub,
+                    });
+                    if !self.eat(&TokenKind::Comma) {
+                        break;
+                    }
+                }
+                let rbrace_tok = self.expect(&TokenKind::RBrace)?;
+                end_span = rbrace_tok.span;
+                kind = StructKind::Record;
+            }
+            TokenKind::LParen => {
+                self.bump();
+                let mut index: usize = 0;
+                while !matches!(self.peek(), TokenKind::RParen) {
+                    let pub_span = if matches!(self.peek(), TokenKind::Pub) {
+                        let t = self.bump();
+                        Some(t.span)
+                    } else {
+                        None
+                    };
+                    let is_pub = pub_span.is_some();
+                    let fty = self.parse_type()?;
+                    let ty_span = type_span(&fty);
+                    let fspan = match pub_span {
+                        Some(ps) => ps.merge(&ty_span),
+                        None => ty_span,
+                    };
+                    let fid = self.new_node_id();
+                    fields.push(Field {
+                        id: fid,
+                        span: fspan,
+                        name: index.to_string(),
+                        ty: fty,
+                        is_pub,
+                    });
+                    index += 1;
+                    if !self.eat(&TokenKind::Comma) {
+                        break;
+                    }
+                }
+                self.expect(&TokenKind::RParen)?;
+                let semi_tok = self.expect(&TokenKind::Semi)?;
+                end_span = semi_tok.span;
+                kind = StructKind::Tuple;
+            }
+            TokenKind::Semi => {
+                let semi_tok = self.bump();
+                end_span = semi_tok.span;
+                kind = StructKind::Unit;
+            }
+            _ => {
+                let _ = self.expect_one_of(&[
+                    TokenKind::LBrace,
+                    TokenKind::LParen,
+                    TokenKind::Semi,
+                ])?;
+                unreachable!();
             }
         }
-        let rbrace_tok = self.expect(&TokenKind::RBrace)?;
-        let end_span = rbrace_tok.span;
 
         let generics = generics_list_span.map(|span| {
             let id = self.new_node_id();
@@ -507,6 +562,7 @@ impl Parser {
             name,
             generics,
             fields,
+            kind,
         }))
     }
 }
@@ -1015,6 +1071,55 @@ mod tests {
         assert_eq!(s.fields[1].name, "field2");
         assert_eq!(type_ident(&s.fields[1].ty), "Ty");
         assert!(s.fields[1].is_pub);
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+    }
+
+    #[test]
+    fn struct_tuple_unit() {
+        // struct Name<T>(T, T);
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Struct),
+            ident_tok("Name"),
+            tok(TokenKind::Lt),
+            ident_tok("T"),
+            tok(TokenKind::Gt),
+            tok(TokenKind::LParen),
+            ident_tok("T"),
+            tok(TokenKind::Comma),
+            ident_tok("T"),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Semi),
+            tok(TokenKind::Eof),
+        ]);
+        let s = as_struct(p.parse_struct().expect("parse_struct"));
+        assert_eq!(s.name, "Name");
+        let generics = s.generics.as_ref().expect("generics");
+        assert_eq!(generics.params.len(), 1);
+        assert_eq!(generics.params[0].name, "T");
+        assert!(matches!(s.kind, StructKind::Tuple));
+        assert_eq!(s.fields.len(), 2);
+        assert!(!s.fields[0].is_pub);
+        assert_eq!(type_ident(&s.fields[0].ty), "T");
+        assert_eq!(s.fields[0].name, "0");
+        assert!(!s.fields[1].is_pub);
+        assert_eq!(type_ident(&s.fields[1].ty), "T");
+        assert_eq!(s.fields[1].name, "1");
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // struct Unit;
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Struct),
+            ident_tok("Unit"),
+            tok(TokenKind::Semi),
+            tok(TokenKind::Eof),
+        ]);
+        let s = as_struct(p.parse_struct().expect("parse_struct"));
+        assert_eq!(s.name, "Unit");
+        assert!(s.generics.is_none());
+        assert!(matches!(s.kind, StructKind::Unit));
+        assert!(s.fields.is_empty());
         assert!(p.errors.is_empty());
         assert!(matches!(p.peek(), TokenKind::Eof));
     }

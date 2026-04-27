@@ -457,7 +457,7 @@
   - [ ] `struct Name<T> { field: Ty, pub field2: Ty }`
   - [ ] **Verify:** `cargo test --lib parser::item::tests::struct_normal`
 
-- [ ] Parse tuple + unit struct items
+- [x] Parse tuple + unit struct items
   - [ ] `struct Name<T>(T, T);`, `struct Unit;`
   - [ ] **Verify:** `cargo test --lib parser::item::tests::struct_tuple_unit`
 
