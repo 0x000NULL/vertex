@@ -10,6 +10,7 @@ pub struct Param {
     pub span: Span,
     pub name: String,
     pub ty: Type,
+    pub is_self: bool,
 }
 
 #[allow(dead_code)]

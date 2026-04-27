@@ -441,7 +441,7 @@
   - [ ] Generic AST node `Attribute { path, args, span }`
   - [ ] **Verify:** `cargo test --lib parser::item::tests::fn_attributes`
 
-- [ ] Add self parameters
+- [x] Add self parameters
   - [ ] `self`, `&self`, `&mut self`, `self: Box<Self>`, `self: Rc<Self>`
   - [ ] **Verify:** `cargo test --lib parser::item::tests::self_params`
 

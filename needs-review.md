@@ -264,3 +264,38 @@ plan=1.225086 exec=2.277349 total=3.502435
 
 ---
 
+
+## add-visibility-pub-pub-crate-pub-super-pub-in-path
+- Item: Add visibility: `pub`, `pub(crate)`, `pub(super)`, `pub(in path)`
+- Reason: cost ceiling
+- Timestamp: 2026-04-27T07:26:08.9092506Z
+
+### Detail
+```
+plan=1.01426675 exec=2.3542085 total=3.36847525
+```
+
+---
+
+
+## add-attribute-parsing
+- Item: Add attribute parsing
+- Reason: blockers
+- Timestamp: 2026-04-27T07:31:09.2171930Z
+
+### Blocker: lexer lacks `#` token
+- severity: cross-item
+- affects: lexer, attribute-parsing, repr-parsing, derive-validation, cfg-attributes
+- question: Is it acceptable to introduce `TokenKind::Pound` and the corresponding scan rule as part of this slug, or should that be split into a dedicated prerequisite item?
+- default_assumption: Add `TokenKind::Pound` and emit it from the scanner inside this slug, since no other pending slug introduces `#` and the verify test cannot run without it.
+- Resolution: 
+
+### Blocker: shape of AttrArgs
+- severity: cross-item
+- affects: attribute-parsing, repr-parsing, derive-validation, cfg-attributes
+- question: Should `AttrArgs` store a raw `Vec<Token>` or a structured form (ident list, name=value, nested call tree)?
+- default_assumption: `AttrArgs::Delimited(Vec<Token>)` — raw tokens. Each consumer slug interprets the slice for its own attribute; keeps stage0 simple and defers meta-syntax design.
+- Resolution: 
+
+---
+

@@ -507,3 +507,20 @@
 ==> plan  add-modifiers-const-unsafe-extern-abi
       plan: 56.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-modifiers-const-unsafe-extern-abi-plan-20260427T071558993.txt
 ==> exec  add-modifiers-const-unsafe-extern-abi
+      exec: 142.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-modifiers-const-unsafe-extern-abi-execute-20260427T071821037.txt
+      notes: - Picked the `Option<String>` shape for `extern_abi` exactly as the plan recommended: `None` = no `extern`, `Some("C")` = `extern "C"`, `Some(String::new())` = bare `extern fn` (test explicitly asserts the empty-string case). / - For duplicate-modifier recovery, pushed an `E0100`/`Syntax` error onto the accumulator at the duplicate token's span, kept the first value seen, and continued the modifier loop (no `recover_to_sync`, since we're still on a known modifier prefix). The plan said "keep the first seen value and continue" — chose the minimal interpretation that doesn't drop tokens.
+    [27/72] add-modifiers-const-unsafe-extern-abi: plan $0.37 / execute $1.20 / verified / committed bce957c
+==> plan  add-visibility-pub-pub-crate-pub-super-pub-in-path
+      plan: 157.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-visibility-pub-pub-crate-pub-super-pub-in-path-plan-20260427T072059874.txt
+==> exec  add-visibility-pub-pub-crate-pub-super-pub-in-path
+      exec: 309.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-visibility-pub-pub-crate-pub-super-pub-in-path-execute-20260427T072608906.txt
+      notes: - **`#[allow(clippy::large_enum_variant)]` added to `Item`**: After adding `vis: Visibility` to `FnDef`, clippy's `large_enum_variant` lint started firing on `Item::Fn(FnDef)` (240 bytes vs. the 200-byte default threshold). The plan locks both the `Visibility` shape (with `Path` not boxed) and the `FnDef` shape (with `vis: Visibility` not boxed), so a structural workaround would deviate from the plan. I added the targeted clippy allow on `Item` alongside the existing `#[allow(dead_code)]` to keep clippy passing without altering the AST shape the plan specifies. / - **`pub()` recovery flow**: For the malformed-`pub()` test, `expected_one_of_error` calls `recover_to_sync`, which advances past the spurious `RParen` and stops at `Fn` (a sync point). Parsing then resumes normally and produces a function with `Visibility::Public(_)` plus an accumulated E0100. This matches the plan's recovery philosophy.
+    [28/72] add-visibility-pub-pub-crate-pub-super-pub-in-path: cost ceiling hit (total=3.36847525)
+==> plan  add-attribute-parsing
+      plan: 199.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-attribute-parsing-plan-20260427T073109199.txt
+    [29/72] add-attribute-parsing: 2 cross-item, 0 local blockers -> needs-review
+        [cross-item] Is it acceptable to introduce `TokenKind::Pound` and the corresponding scan rule as part of this slug, or should that be split into a dedicated prerequisite item?
+          default: Add `TokenKind::Pound` and emit it from the scanner inside this slug, since no other pending slug introduces `#` and the verify test cannot run without it.
+        [cross-item] Should `AttrArgs` store a raw `Vec<Token>` or a structured form (ident list, name=value, nested call tree)?
+          default: `AttrArgs::Delimited(Vec<Token>)` — raw tokens. Each consumer slug interprets the slice for its own attribute; keeps stage0 simple and defers meta-syntax design.
+==> plan  add-self-parameters
