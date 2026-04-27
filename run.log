@@ -480,3 +480,11 @@
       notes: - The plan said to add `use crate::ast::expr::{Block, Expr};` even though `Expr` is already in scope via `use super::*;` (the production module imports `Expr` at line 1). I followed the plan literally; rustc accepts the redundant import without warnings. / - For the "all semi'd" case I used a small `for (i, expected) in [(0,1),(1,2)]` loop to assert both stmts symmetrically rather than two copy-pasted `match` arms. Same assertions, same coverage; chose this as the more concise interpretation of "two `Stmt::Expr { has_semi: true }`".
     [22/72] block-trailing-expression-as-value-semantics: plan $0.75 / execute $0.66 / verified / committed 2a37911
 ==> plan  insert-placeholder-expr-error-nodeid-span-and-continue
+      plan: 114.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\insert-placeholder-expr-error-nodeid-span-and-continue-plan-20260427T070057233.txt
+==> exec  insert-placeholder-expr-error-nodeid-span-and-continue
+      exec: 205.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\insert-placeholder-expr-error-nodeid-span-and-continue-execute-20260427T070422273.txt
+      notes: - The `errors: Vec<CompileError>` field of `ErrorAccumulator` is private to `error/mod.rs`, and the plan's "Files" list excludes that module. To inspect `code`/`kind` on the lone error from inside `parser::tests`, the test uses `std::mem::take(&mut p.errors).into_result(())` — a non-invasive read using the existing public surface — rather than adding a new accessor. Conservative because it doesn't widen the public API. / - The plan's test description says "Asserts the block has 1 stmt whose expr matches `Expr::Error(_, _)`". The recovered statement lands as `Stmt::Expr { has_semi: false, expr: Expr::Error(..) }` (matching the plan's note that `recover_to_sync` already eats the trailing `;`); the test asserts on the variant via `matches!` and ignores `has_semi`, mirroring the plan's wording.
+    [23/72] insert-placeholder-expr-error-nodeid-span-and-continue: plan $0.95 / execute $1.38 / verified / committed 28a95fd
+==> plan  expected-one-of-messages
+      plan: 101.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\expected-one-of-messages-plan-20260427T070604988.txt
+==> exec  expected-one-of-messages

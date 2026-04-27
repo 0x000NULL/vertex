@@ -411,7 +411,7 @@
   - [ ] On parse failure, push `CompileError`, return placeholder, sync to next stmt boundary
   - [ ] **Verify:** `cargo test --lib parser::tests::error_node_recovery`
 
-- [ ] "Expected one of: ..." messages
+- [x] "Expected one of: ..." messages
   - [ ] On `expect` mismatch, build message listing candidate follow-set
   - [ ] **Verify:** `cargo test --lib parser::tests::expected_message_lists_candidates`
 

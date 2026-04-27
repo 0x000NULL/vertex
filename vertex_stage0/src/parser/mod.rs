@@ -83,10 +83,44 @@ impl Parser {
         }
     }
 
+    pub fn expect_one_of(&mut self, kinds: &[TokenKind]) -> Result<Token, CompileError> {
+        let peeked = mem::discriminant(self.peek());
+        if kinds.iter().any(|k| mem::discriminant(k) == peeked) {
+            Ok(self.bump())
+        } else {
+            let found = self.peek();
+            let span = self.current_span();
+            let message = format!(
+                "expected {}, found {}",
+                format_candidate_list(kinds),
+                describe(found),
+            );
+            Err(CompileError::new(
+                ErrorCode::E0100,
+                ErrorKind::Syntax,
+                span,
+                message,
+            ))
+        }
+    }
+
     pub fn expected_token_error(&mut self, expected: &TokenKind) {
         let found = self.peek();
         let span = self.current_span();
         let message = format!("expected {}, found {}", describe(expected), describe(found));
+        let err = CompileError::new(ErrorCode::E0100, ErrorKind::Syntax, span, message);
+        self.errors.push(err);
+        self.recover_to_sync();
+    }
+
+    pub fn expected_one_of_error(&mut self, kinds: &[TokenKind]) {
+        let found = self.peek();
+        let span = self.current_span();
+        let message = format!(
+            "expected {}, found {}",
+            format_candidate_list(kinds),
+            describe(found),
+        );
         let err = CompileError::new(ErrorCode::E0100, ErrorKind::Syntax, span, message);
         self.errors.push(err);
         self.recover_to_sync();
@@ -131,6 +165,25 @@ fn is_sync_point(kind: &TokenKind) -> bool {
             | TokenKind::Unsafe
             | TokenKind::Extern
     )
+}
+
+fn format_candidate_list(kinds: &[TokenKind]) -> String {
+    debug_assert!(!kinds.is_empty(), "format_candidate_list: empty candidate slice");
+    match kinds {
+        [] => "token".to_string(),
+        [a] => describe(a).to_string(),
+        [a, b] => format!("{} or {}", describe(a), describe(b)),
+        [head @ .., last] => {
+            let mut out = String::new();
+            for k in head {
+                out.push_str(describe(k));
+                out.push_str(", ");
+            }
+            out.push_str("or ");
+            out.push_str(describe(last));
+            out
+        }
+    }
 }
 
 fn describe(kind: &TokenKind) -> &'static str {
@@ -281,6 +334,54 @@ mod tests {
         ]);
         p.recover_to_sync();
         assert_eq!(p.peek(), &TokenKind::Fn);
+    }
+
+    #[test]
+    fn expected_message_lists_candidates() {
+        let mut p = Parser::new(vec![tok(TokenKind::Semi), tok(TokenKind::Eof)]);
+        let err = p
+            .expect_one_of(&[TokenKind::Plus])
+            .expect_err("mismatch should error");
+        assert_eq!(err.code, ErrorCode::E0100);
+        assert_eq!(err.kind, ErrorKind::Syntax);
+        assert!(
+            err.message.contains("expected `+`, found `;`"),
+            "single-kind message: {}",
+            err.message,
+        );
+
+        let mut p = Parser::new(vec![tok(TokenKind::Semi), tok(TokenKind::Eof)]);
+        let err = p
+            .expect_one_of(&[TokenKind::Comma, TokenKind::RParen])
+            .expect_err("mismatch should error");
+        assert_eq!(err.code, ErrorCode::E0100);
+        assert_eq!(err.kind, ErrorKind::Syntax);
+        assert!(
+            err.message.contains("expected `,` or `)`, found `;`"),
+            "two-kind message: {}",
+            err.message,
+        );
+
+        let mut p = Parser::new(vec![tok(TokenKind::RBrace), tok(TokenKind::Eof)]);
+        let err = p
+            .expect_one_of(&[TokenKind::Comma, TokenKind::Semi, TokenKind::RBracket])
+            .expect_err("mismatch should error");
+        assert_eq!(err.code, ErrorCode::E0100);
+        assert_eq!(err.kind, ErrorKind::Syntax);
+        assert!(
+            err.message
+                .contains("expected `,`, `;`, or `]`, found `}`"),
+            "three-kind message: {}",
+            err.message,
+        );
+
+        let mut p = Parser::new(vec![tok(TokenKind::Comma), tok(TokenKind::Eof)]);
+        let start_pos = p.pos;
+        let t = p
+            .expect_one_of(&[TokenKind::Comma, TokenKind::Semi])
+            .expect("matching kind should return Ok");
+        assert_eq!(t.kind, TokenKind::Comma);
+        assert_eq!(p.pos, start_pos + 1);
     }
 
     #[test]
