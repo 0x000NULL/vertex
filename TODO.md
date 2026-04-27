@@ -340,7 +340,7 @@
   - [ ] `f(args)`, `x.method(args)`, `x.field`, `x.0`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::call_method_field`
 
-- [ ] Parse indexing + cast + try
+- [x] Parse indexing + cast + try
   - [ ] `x[i]`, `x as T`, `x?`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::index_cast_try`
 

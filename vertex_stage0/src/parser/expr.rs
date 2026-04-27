@@ -1,6 +1,6 @@
 use crate::ast::expr::{
-    Binary, BinaryOp, BoolLit, Call, CharLit, Expr, FieldAccess, FloatLit, IntLit, MethodCall,
-    StrLit, TupleFieldAccess, TupleLit, Unary, UnaryOp,
+    Binary, BinaryOp, BoolLit, Call, Cast, CastTy, CharLit, Expr, FieldAccess, FloatLit, Index,
+    IntLit, MethodCall, StrLit, Try, TupleFieldAccess, TupleLit, Unary, UnaryOp,
 };
 use crate::error::{CompileError, ErrorCode, ErrorKind};
 use crate::lexer::token::TokenKind;
@@ -149,7 +149,7 @@ impl Parser {
     }
 
     fn parse_binary(&mut self, min_bp: u8) -> Result<Expr, CompileError> {
-        let mut lhs = self.parse_unary()?;
+        let mut lhs = self.parse_cast()?;
 
         while let Some((left_bp, right_bp, op, class)) = infix_binding_power(self.peek()) {
             if left_bp < min_bp {
@@ -194,6 +194,27 @@ impl Parser {
             });
         }
 
+        Ok(lhs)
+    }
+
+    fn parse_cast(&mut self) -> Result<Expr, CompileError> {
+        let mut lhs = self.parse_unary()?;
+        while matches!(self.peek(), TokenKind::Ident(s) if s == "as") {
+            self.bump();
+            // TODO: replace when type parser lands
+            let ty_tok = match self.peek() {
+                TokenKind::Ident(_) | TokenKind::SelfUpper => self.bump(),
+                _ => return Err(self.unexpected_token_error("type after `as`")),
+            };
+            let span = lhs.span().merge(&ty_tok.span);
+            let id = self.new_node_id();
+            lhs = Expr::Cast(Cast {
+                id,
+                span,
+                expr: Box::new(lhs),
+                ty: Box::new(CastTy::Placeholder),
+            });
+        }
         Ok(lhs)
     }
 
@@ -264,6 +285,29 @@ impl Parser {
                         span,
                         callee: Box::new(expr),
                         args,
+                    });
+                }
+                TokenKind::LBracket => {
+                    self.bump();
+                    let idx = self.parse_expr()?;
+                    let rbracket_tok = self.expect(&TokenKind::RBracket)?;
+                    let span = expr.span().merge(&rbracket_tok.span);
+                    let id = self.new_node_id();
+                    expr = Expr::Index(Index {
+                        id,
+                        span,
+                        receiver: Box::new(expr),
+                        idx: Box::new(idx),
+                    });
+                }
+                TokenKind::Question => {
+                    let q_tok = self.bump();
+                    let span = expr.span().merge(&q_tok.span);
+                    let id = self.new_node_id();
+                    expr = Expr::Try(Try {
+                        id,
+                        span,
+                        expr: Box::new(expr),
                     });
                 }
                 TokenKind::Dot => {
@@ -1171,6 +1215,139 @@ mod tests {
         }
         assert_eq!(p.pos, 9);
         assert!(p.errors.is_empty());
+    }
+
+    #[test]
+    fn index_cast_try() {
+        // 42[1i32]
+        let mut p = Parser::new(vec![
+            int_tok(42),
+            tok(TokenKind::LBracket),
+            int_tok(1),
+            tok(TokenKind::RBracket),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Ok(Expr::Index(i)) => {
+                match *i.receiver {
+                    Expr::IntLit(lit) => assert_eq!(lit.value, 42),
+                    other => panic!("expected IntLit receiver, got {:?}", other),
+                }
+                match *i.idx {
+                    Expr::IntLit(lit) => assert_eq!(lit.value, 1),
+                    other => panic!("expected IntLit idx, got {:?}", other),
+                }
+            }
+            other => panic!("expected Ok(Index) for `42[1i32]`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 4);
+        assert!(p.errors.is_empty());
+
+        // 42?
+        let mut p = Parser::new(vec![
+            int_tok(42),
+            tok(TokenKind::Question),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Ok(Expr::Try(t)) => match *t.expr {
+                Expr::IntLit(lit) => assert_eq!(lit.value, 42),
+                other => panic!("expected IntLit, got {:?}", other),
+            },
+            other => panic!("expected Ok(Try) for `42?`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 2);
+        assert!(p.errors.is_empty());
+
+        // 42 as i32 (via parse_expr)
+        let mut p = Parser::new(vec![
+            int_tok(42),
+            tok(TokenKind::Ident("as".to_string())),
+            tok(TokenKind::Ident("i32".to_string())),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Cast(c)) => {
+                match *c.expr {
+                    Expr::IntLit(lit) => assert_eq!(lit.value, 42),
+                    other => panic!("expected IntLit, got {:?}", other),
+                }
+                assert!(matches!(*c.ty, CastTy::Placeholder));
+            }
+            other => panic!("expected Ok(Cast) for `42 as i32`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 3);
+        assert!(p.errors.is_empty());
+
+        // - 7i32 as i32 → Cast(Unary(Neg, _), Placeholder)
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Minus),
+            int_tok(7),
+            tok(TokenKind::Ident("as".to_string())),
+            tok(TokenKind::Ident("i32".to_string())),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Cast(c)) => {
+                assert!(matches!(*c.ty, CastTy::Placeholder));
+                match *c.expr {
+                    Expr::Unary(u) => {
+                        assert_eq!(u.op, UnaryOp::Neg);
+                        match *u.operand {
+                            Expr::IntLit(lit) => assert_eq!(lit.value, 7),
+                            other => panic!("expected IntLit operand, got {:?}", other),
+                        }
+                    }
+                    other => panic!("expected Unary(Neg, _), got {:?}", other),
+                }
+            }
+            other => panic!(
+                "expected Ok(Cast(Unary(Neg, _), _)) for `- 7i32 as i32`, got {:?}",
+                other
+            ),
+        }
+        assert_eq!(p.pos, 4);
+        assert!(p.errors.is_empty());
+
+        // 42[1i32]? → Try(Index(IntLit, IntLit))
+        let mut p = Parser::new(vec![
+            int_tok(42),
+            tok(TokenKind::LBracket),
+            int_tok(1),
+            tok(TokenKind::RBracket),
+            tok(TokenKind::Question),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Ok(Expr::Try(t)) => match *t.expr {
+                Expr::Index(i) => {
+                    match *i.receiver {
+                        Expr::IntLit(lit) => assert_eq!(lit.value, 42),
+                        other => panic!("expected IntLit receiver, got {:?}", other),
+                    }
+                    match *i.idx {
+                        Expr::IntLit(lit) => assert_eq!(lit.value, 1),
+                        other => panic!("expected IntLit idx, got {:?}", other),
+                    }
+                }
+                other => panic!("expected Index, got {:?}", other),
+            },
+            other => panic!("expected Ok(Try) for `42[1i32]?`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 5);
+        assert!(p.errors.is_empty());
+
+        // 42[1 (missing `]`) → Err E0100
+        let mut p = Parser::new(vec![
+            int_tok(42),
+            tok(TokenKind::LBracket),
+            int_tok(1),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Err(e) => assert_eq!(e.code, ErrorCode::E0100),
+            Ok(other) => panic!("expected Err(E0100) for `42[1`, got Ok({:?})", other),
+        }
     }
 
     #[test]
