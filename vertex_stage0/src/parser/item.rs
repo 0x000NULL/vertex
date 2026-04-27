@@ -1,9 +1,11 @@
-use crate::ast::expr::{Expr, GenericArg, Path, PathSegment};
+use crate::ast::expr::{Expr, GenericArg, IntLit, Path, PathSegment};
 use crate::ast::generics::{Generics, TraitBound, TypeParam, WhereClause, WherePred};
-use crate::ast::item::{Field, FnDef, Item, Param, StructDef, StructKind};
+use crate::ast::item::{
+    EnumDef, EnumVariant, Field, FnDef, Item, Param, StructDef, StructKind, VariantKind,
+};
 use crate::ast::ty::Type;
 use crate::error::{CompileError, ErrorCode, ErrorKind};
-use crate::lexer::token::TokenKind;
+use crate::lexer::token::{IntSuffix, TokenKind};
 use crate::parser::Parser;
 use crate::span::Span;
 
@@ -563,6 +565,142 @@ impl Parser {
             generics,
             fields,
             kind,
+        }))
+    }
+
+    pub fn parse_enum(&mut self) -> Result<Item, CompileError> {
+        let enum_kw = self.expect(&TokenKind::Enum)?;
+        let start_span = enum_kw.span;
+
+        let name_tok = self.expect(&TokenKind::Ident(String::new()))?;
+        let name = match name_tok.kind {
+            TokenKind::Ident(s) => s,
+            _ => unreachable!(),
+        };
+
+        let mut generic_params: Vec<TypeParam> = Vec::new();
+        let mut generics_list_span: Option<Span> = None;
+        if matches!(self.peek(), TokenKind::Lt) {
+            let lt_span = self.tokens[self.pos].span;
+            let (params, gt_span) = self.parse_generics_params()?;
+            generic_params = params;
+            generics_list_span = Some(lt_span.merge(&gt_span));
+        }
+
+        self.expect(&TokenKind::LBrace)?;
+        let mut variants: Vec<EnumVariant> = Vec::new();
+        while !matches!(self.peek(), TokenKind::RBrace) {
+            let vname_tok = self.expect(&TokenKind::Ident(String::new()))?;
+            let vname_span = vname_tok.span;
+            let vname = match vname_tok.kind {
+                TokenKind::Ident(s) => s,
+                _ => unreachable!(),
+            };
+
+            let mut variant_end_span = vname_span;
+            let kind = match self.peek() {
+                TokenKind::LParen => {
+                    self.bump();
+                    let mut tys: Vec<Type> = Vec::new();
+                    while !matches!(self.peek(), TokenKind::RParen) {
+                        let ty = self.parse_type()?;
+                        tys.push(ty);
+                        if !self.eat(&TokenKind::Comma) {
+                            break;
+                        }
+                    }
+                    let rparen_tok = self.expect(&TokenKind::RParen)?;
+                    variant_end_span = rparen_tok.span;
+                    VariantKind::Tuple(tys)
+                }
+                TokenKind::LBrace => {
+                    self.bump();
+                    let mut fields: Vec<Field> = Vec::new();
+                    while !matches!(self.peek(), TokenKind::RBrace) {
+                        let is_pub = self.eat(&TokenKind::Pub);
+                        let fname_tok = self.expect(&TokenKind::Ident(String::new()))?;
+                        let fname_span = fname_tok.span;
+                        let fname = match fname_tok.kind {
+                            TokenKind::Ident(s) => s,
+                            _ => unreachable!(),
+                        };
+                        self.expect(&TokenKind::Colon)?;
+                        let fty = self.parse_type()?;
+                        let fspan = fname_span.merge(&type_span(&fty));
+                        let fid = self.new_node_id();
+                        fields.push(Field {
+                            id: fid,
+                            span: fspan,
+                            name: fname,
+                            ty: fty,
+                            is_pub,
+                        });
+                        if !self.eat(&TokenKind::Comma) {
+                            break;
+                        }
+                    }
+                    let rbrace_tok = self.expect(&TokenKind::RBrace)?;
+                    variant_end_span = rbrace_tok.span;
+                    VariantKind::Struct(fields)
+                }
+                _ => VariantKind::Unit,
+            };
+
+            let discriminant = if self.eat(&TokenKind::Eq) {
+                let lit_tok =
+                    self.expect(&TokenKind::IntLiteral(0, IntSuffix::Unsuffixed))?;
+                let lit_span = lit_tok.span;
+                let (value, suffix) = match lit_tok.kind {
+                    TokenKind::IntLiteral(v, s) => (v, s),
+                    _ => unreachable!(),
+                };
+                let lit_id = self.new_node_id();
+                variant_end_span = lit_span;
+                Some(Expr::IntLit(IntLit {
+                    id: lit_id,
+                    span: lit_span,
+                    value,
+                    suffix,
+                }))
+            } else {
+                None
+            };
+
+            let variant_span = vname_span.merge(&variant_end_span);
+            let variant_id = self.new_node_id();
+            variants.push(EnumVariant {
+                id: variant_id,
+                span: variant_span,
+                name: vname,
+                kind,
+                discriminant,
+            });
+
+            if !self.eat(&TokenKind::Comma) {
+                break;
+            }
+        }
+        let rbrace_tok = self.expect(&TokenKind::RBrace)?;
+        let end_span = rbrace_tok.span;
+
+        let generics = generics_list_span.map(|span| {
+            let id = self.new_node_id();
+            Generics {
+                id,
+                span,
+                params: generic_params,
+                where_clause: None,
+            }
+        });
+
+        let span = start_span.merge(&end_span);
+        let id = self.new_node_id();
+        Ok(Item::Enum(EnumDef {
+            id,
+            span,
+            name,
+            generics,
+            variants,
         }))
     }
 }
@@ -1172,6 +1310,163 @@ mod tests {
         assert_eq!(f.params.len(), 1);
         assert_eq!(f.params[0].name, "x");
         assert_eq!(type_ident(&f.params[0].ty), "T");
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+    }
+
+    fn as_enum(item: Item) -> EnumDef {
+        match item {
+            Item::Enum(e) => e,
+            other => panic!("expected Item::Enum, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn enum_all_variant_kinds() {
+        // enum E { A, B(i32, i32), C { x: i32, y: i32 } }
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Enum),
+            ident_tok("E"),
+            tok(TokenKind::LBrace),
+            ident_tok("A"),
+            tok(TokenKind::Comma),
+            ident_tok("B"),
+            tok(TokenKind::LParen),
+            ident_tok("i32"),
+            tok(TokenKind::Comma),
+            ident_tok("i32"),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Comma),
+            ident_tok("C"),
+            tok(TokenKind::LBrace),
+            ident_tok("x"),
+            tok(TokenKind::Colon),
+            ident_tok("i32"),
+            tok(TokenKind::Comma),
+            ident_tok("y"),
+            tok(TokenKind::Colon),
+            ident_tok("i32"),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let e = as_enum(p.parse_enum().expect("parse_enum"));
+        assert_eq!(e.name, "E");
+        assert!(e.generics.is_none());
+        assert_eq!(e.variants.len(), 3);
+        assert_eq!(e.variants[0].name, "A");
+        assert!(matches!(e.variants[0].kind, VariantKind::Unit));
+        assert!(e.variants[0].discriminant.is_none());
+        assert_eq!(e.variants[1].name, "B");
+        match &e.variants[1].kind {
+            VariantKind::Tuple(tys) => {
+                assert_eq!(tys.len(), 2);
+                assert_eq!(type_ident(&tys[0]), "i32");
+                assert_eq!(type_ident(&tys[1]), "i32");
+            }
+            other => panic!("expected VariantKind::Tuple, got {:?}", other),
+        }
+        assert!(e.variants[1].discriminant.is_none());
+        assert_eq!(e.variants[2].name, "C");
+        match &e.variants[2].kind {
+            VariantKind::Struct(fields) => {
+                assert_eq!(fields.len(), 2);
+                assert_eq!(fields[0].name, "x");
+                assert_eq!(type_ident(&fields[0].ty), "i32");
+                assert_eq!(fields[1].name, "y");
+                assert_eq!(type_ident(&fields[1].ty), "i32");
+            }
+            other => panic!("expected VariantKind::Struct, got {:?}", other),
+        }
+        assert!(e.variants[2].discriminant.is_none());
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // enum E { Foo = 5, Bar = 7, }
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Enum),
+            ident_tok("E"),
+            tok(TokenKind::LBrace),
+            ident_tok("Foo"),
+            tok(TokenKind::Eq),
+            int_tok(5),
+            tok(TokenKind::Comma),
+            ident_tok("Bar"),
+            tok(TokenKind::Eq),
+            int_tok(7),
+            tok(TokenKind::Comma),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let e = as_enum(p.parse_enum().expect("parse_enum"));
+        assert_eq!(e.name, "E");
+        assert!(e.generics.is_none());
+        assert_eq!(e.variants.len(), 2);
+        assert_eq!(e.variants[0].name, "Foo");
+        assert!(matches!(e.variants[0].kind, VariantKind::Unit));
+        match e.variants[0].discriminant.as_ref().expect("discriminant Foo") {
+            Expr::IntLit(lit) => assert_eq!(lit.value, 5),
+            other => panic!("expected IntLit discriminant, got {:?}", other),
+        }
+        assert_eq!(e.variants[1].name, "Bar");
+        assert!(matches!(e.variants[1].kind, VariantKind::Unit));
+        match e.variants[1].discriminant.as_ref().expect("discriminant Bar") {
+            Expr::IntLit(lit) => assert_eq!(lit.value, 7),
+            other => panic!("expected IntLit discriminant, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // enum Result<T, E> { Ok(T), Err(E) }
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Enum),
+            ident_tok("Result"),
+            tok(TokenKind::Lt),
+            ident_tok("T"),
+            tok(TokenKind::Comma),
+            ident_tok("E"),
+            tok(TokenKind::Gt),
+            tok(TokenKind::LBrace),
+            ident_tok("Ok"),
+            tok(TokenKind::LParen),
+            ident_tok("T"),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Comma),
+            ident_tok("Err"),
+            tok(TokenKind::LParen),
+            ident_tok("E"),
+            tok(TokenKind::RParen),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let e = as_enum(p.parse_enum().expect("parse_enum"));
+        assert_eq!(e.name, "Result");
+        let generics = e.generics.as_ref().expect("generics");
+        assert_eq!(generics.params.len(), 2);
+        assert_eq!(generics.params[0].name, "T");
+        assert!(generics.params[0].bounds.is_empty());
+        assert_eq!(generics.params[1].name, "E");
+        assert!(generics.params[1].bounds.is_empty());
+        assert!(generics.where_clause.is_none());
+        assert_eq!(e.variants.len(), 2);
+        assert_eq!(e.variants[0].name, "Ok");
+        match &e.variants[0].kind {
+            VariantKind::Tuple(tys) => {
+                assert_eq!(tys.len(), 1);
+                assert_eq!(type_ident(&tys[0]), "T");
+            }
+            other => panic!("expected VariantKind::Tuple, got {:?}", other),
+        }
+        assert!(e.variants[0].discriminant.is_none());
+        assert_eq!(e.variants[1].name, "Err");
+        match &e.variants[1].kind {
+            VariantKind::Tuple(tys) => {
+                assert_eq!(tys.len(), 1);
+                assert_eq!(type_ident(&tys[0]), "E");
+            }
+            other => panic!("expected VariantKind::Tuple, got {:?}", other),
+        }
+        assert!(e.variants[1].discriminant.is_none());
         assert!(p.errors.is_empty());
         assert!(matches!(p.peek(), TokenKind::Eof));
     }

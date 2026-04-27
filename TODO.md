@@ -465,7 +465,7 @@
   - [ ] `#[repr(C)]`, `#[repr(transparent)]` (AST only — no semantic checks)
   - [ ] **Verify:** `cargo test --lib parser::item::tests::struct_repr`
 
-- [ ] Parse enum items with all variant kinds
+- [x] Parse enum items with all variant kinds
   - [ ] Unit variants, tuple variants, struct variants
   - [ ] Explicit discriminants `Foo = 5,`
   - [ ] Generic enums `enum Result<T, E> { Ok(T), Err(E) }`

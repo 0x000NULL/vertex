@@ -1,4 +1,4 @@
-use crate::ast::expr::Block;
+use crate::ast::expr::{Block, Expr};
 use crate::ast::generics::Generics;
 use crate::ast::ty::Type;
 use crate::ast::NodeId;
@@ -62,9 +62,30 @@ pub struct StructDef {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
+pub enum VariantKind {
+    Unit,
+    Tuple(Vec<Type>),
+    Struct(Vec<Field>),
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct EnumVariant {
+    pub id: NodeId,
+    pub span: Span,
+    pub name: String,
+    pub kind: VariantKind,
+    pub discriminant: Option<Expr>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub struct EnumDef {
     pub id: NodeId,
     pub span: Span,
+    pub name: String,
+    pub generics: Option<Generics>,
+    pub variants: Vec<EnumVariant>,
 }
 
 #[allow(dead_code)]

@@ -542,3 +542,16 @@
       notes: - None — the plan was unambiguous and all interpretations matched the existing patterns (mirrored `parse_fn`'s generics handling, `Param`-style `Field` shape, and `tok`/`ident_tok`-based test layout).
     [32/72] parse-normal-struct-items: plan $1.24 / execute $0.85 / verified / committed 0020c90
 ==> plan  parse-tuple-unit-struct-items
+      plan: 94.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-tuple-unit-struct-items-plan-20260427T074816503.txt
+==> exec  parse-tuple-unit-struct-items
+      exec: 76.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-tuple-unit-struct-items-execute-20260427T074932539.txt
+      notes: - The plan said "End span = the closing `RBrace` (unchanged)" for the record branch and asked for `expect_one_of(&[LBrace, LParen, Semi])` as the failure path. Since the new structure dispatches before any single `expect`, I added an explicit `_ =>` arm that calls `expect_one_of(&[LBrace, LParen, Semi])` and then `unreachable!()` (since the call would have returned `Err` already). This preserves the requested error message shape with no behavioral regression for valid inputs. / - For tuple-field span composition I used `pub_span_or_type_span..type_span` literally as `pub_span.merge(&type_span)` when `pub` is present, otherwise just the type span. The plan's syntax was ambiguous between "start..end" or just "use whichever exists"; merging with the type span when `pub` is present is the conservative reading that matches how record fields and `parse_fn` modifiers compose spans elsewhere.
+    [33/72] parse-tuple-unit-struct-items: plan $0.64 / execute $0.60 / verified / committed fdece8a
+==> plan  add-repr-parsing-on-structs
+      plan: 109.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-repr-parsing-on-structs-plan-20260427T075123361.txt
+    [34/72] add-repr-parsing-on-structs: 1 cross-item, 1 local blockers -> needs-review
+        [cross-item] Has `add-attribute-parsing` already added a `Pound` (or `Hash`) `TokenKind` and a basic `Attribute` AST node, or is this item expected to add the lexer support itself?
+          default: Proceed assuming `add-attribute-parsing` runs first and provides `TokenKind::Pound`. If it has not, the execute phase will additionally (a) add `TokenKind::Pound` to `src/lexer/token.rs`, (b) emit it from `src/lexer/scan.rs` for `#` (replacing the current `Error("invalid character: #")` path), and (c) update the `builtin_derive_attr` lexer test to expect the new token. Tests in this plan use the `Pound` token directly via `tok(TokenKind::Pound)` regardless.
+        [local] Should `parse_struct` also consume non-`repr` attributes (silently dropping them) so it can survive code with mixed attributes, or should it bail/error on any non-`repr` attribute?
+          default: Silently consume any leading `#[Ident(Ident)]` attribute, only mirroring the value when the outer ident is `repr`. This keeps the parser tolerant and avoids tripping on `#[derive(...)]` etc. that other items will later add proper handling for.
+==> plan  parse-enum-items-with-all-variant-kinds

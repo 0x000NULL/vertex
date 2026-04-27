@@ -299,3 +299,25 @@ plan=1.01426675 exec=2.3542085 total=3.36847525
 
 ---
 
+
+## add-repr-parsing-on-structs
+- Item: Add `#[repr(...)]` parsing on structs
+- Reason: blockers
+- Timestamp: 2026-04-27T07:51:23.3729414Z
+
+### Blocker: prereq not landed
+- severity: cross-item
+- affects: add-attribute-parsing, lexer Pound token, attribute AST shape
+- question: Has `add-attribute-parsing` already added a `Pound` (or `Hash`) `TokenKind` and a basic `Attribute` AST node, or is this item expected to add the lexer support itself?
+- default_assumption: Proceed assuming `add-attribute-parsing` runs first and provides `TokenKind::Pound`. If it has not, the execute phase will additionally (a) add `TokenKind::Pound` to `src/lexer/token.rs`, (b) emit it from `src/lexer/scan.rs` for `#` (replacing the current `Error("invalid character: #")` path), and (c) update the `builtin_derive_attr` lexer test to expect the new token. Tests in this plan use the `Pound` token directly via `tok(TokenKind::Pound)` regardless.
+- Resolution: 
+
+### Blocker: scope of attribute consumption
+- severity: local
+- affects: parse_struct, future general attribute parsing
+- question: Should `parse_struct` also consume non-`repr` attributes (silently dropping them) so it can survive code with mixed attributes, or should it bail/error on any non-`repr` attribute?
+- default_assumption: Silently consume any leading `#[Ident(Ident)]` attribute, only mirroring the value when the outer ident is `repr`. This keeps the parser tolerant and avoids tripping on `#[derive(...)]` etc. that other items will later add proper handling for.
+- Resolution: 
+
+---
+
