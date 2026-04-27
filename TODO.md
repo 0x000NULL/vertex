@@ -366,7 +366,7 @@
   - [ ] Block as last-stmt-without-semi → block-typed; otherwise unit
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::block_trailing_expr`
 
-- [ ] Parse if/else expressions
+- [x] Parse if/else expressions
   - [ ] `if cond { a } else if cond2 { b } else { c }`
   - [ ] Non-block branches not allowed (must be `{ ... }`)
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::if_else_chain`

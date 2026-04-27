@@ -428,3 +428,7 @@
 ==> plan  parse-block-expressions
       plan: 146.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-block-expressions-plan-20260427T061441107.txt
 ==> exec  parse-block-expressions
+      exec: 130.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-block-expressions-execute-20260427T061651157.txt
+      notes: - Imported `Stmt` via `use crate::ast::stmt::Stmt;` rather than re-exporting through the top-level `crate::ast` re-export — both work; chose the more specific path to match the file's existing `crate::ast::expr::*` and `crate::lexer::token::TokenKind` import style. / - The test's `stmts[i]` matching uses `&b.stmts[0]` / `match &b.stmts[i]` (borrow) so that subsequent index accesses still see a populated `Vec`; `int_value` already takes `&Expr`, so this fits without cloning.
+    [14/72] parse-block-expressions: plan $1.14 / execute $1.27 / verified / committed c4727cf
+==> plan  parse-if-else-expressions

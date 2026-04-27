@@ -1,6 +1,6 @@
 use crate::ast::expr::{
     ArrayLit, ArrayRepeat, Binary, BinaryOp, Block, BoolLit, Call, Cast, CastTy, CharLit, Closure,
-    ClosureParam, Expr, FieldAccess, FloatLit, Index, IntLit, MethodCall, Range, StrLit, Try,
+    ClosureParam, Expr, FieldAccess, FloatLit, If, Index, IntLit, MethodCall, Range, StrLit, Try,
     TupleFieldAccess, TupleLit, Unary, UnaryOp,
 };
 use crate::ast::stmt::Stmt;
@@ -302,6 +302,36 @@ impl Parser {
             }
         }
         Ok(ClosureParam::Placeholder)
+    }
+
+    fn parse_if(&mut self) -> Result<Expr, CompileError> {
+        let if_tok = self.expect(&TokenKind::If)?;
+        let start_span = if_tok.span;
+        let cond = self.parse_expr()?;
+        let then = self.parse_block()?;
+        let else_branch = if matches!(self.peek(), TokenKind::Else) {
+            self.bump();
+            match self.peek() {
+                TokenKind::If => Some(Box::new(self.parse_if()?)),
+                TokenKind::LBrace => Some(Box::new(self.parse_block()?)),
+                _ => return Err(self.unexpected_token_error("`{` or `if`")),
+            }
+        } else {
+            None
+        };
+        let end_span = match &else_branch {
+            Some(b) => b.span(),
+            None => then.span(),
+        };
+        let span = start_span.merge(&end_span);
+        let id = self.new_node_id();
+        Ok(Expr::If(If {
+            id,
+            span,
+            cond: Box::new(cond),
+            then: Box::new(then),
+            else_branch,
+        }))
     }
 
     pub fn parse_block(&mut self) -> Result<Expr, CompileError> {
@@ -659,6 +689,7 @@ impl Parser {
             TokenKind::True | TokenKind::False => self.parse_bool_lit(),
             TokenKind::LBracket => self.parse_array_literal(),
             TokenKind::LBrace => self.parse_block(),
+            TokenKind::If => self.parse_if(),
             _ => Err(self.unexpected_token_error("expression")),
         }
     }
@@ -680,7 +711,7 @@ impl Parser {
     }
 }
 
-// TODO: extend this set when `Ident`/`If`/`Match`/`Loop`/`Block`/`[`/path heads
+// TODO: extend this set when `Ident`/`Match`/`Loop`/`Block`/`[`/path heads
 // become valid expression starters; otherwise `a.. <new-form>` will be misparsed
 // as `a..` followed by stray tokens.
 fn range_rhs_starts_here(kind: &TokenKind) -> bool {
@@ -698,6 +729,7 @@ fn range_rhs_starts_here(kind: &TokenKind) -> bool {
             | TokenKind::Not
             | TokenKind::Star
             | TokenKind::Amp
+            | TokenKind::If
     )
 }
 
@@ -2104,6 +2136,141 @@ mod tests {
         let mut p = Parser::new(vec![
             tok(TokenKind::LBrace),
             int_tok(1),
+            tok(TokenKind::Eof),
+        ]);
+        assert!(p.parse_expr().is_err());
+    }
+
+    #[test]
+    fn if_else_chain() {
+        // if true { 1i32 } → Expr::If with no else
+        let mut p = Parser::new(vec![
+            tok(TokenKind::If),
+            tok(TokenKind::True),
+            tok(TokenKind::LBrace),
+            int_tok(1),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::If(e)) => {
+                match &*e.cond {
+                    Expr::BoolLit(b) => assert!(b.value),
+                    other => panic!("expected BoolLit cond, got {:?}", other),
+                }
+                match &*e.then {
+                    Expr::Block(b) => {
+                        let tail = b.tail.as_ref().expect("tail");
+                        assert_eq!(int_value(tail), 1);
+                    }
+                    other => panic!("expected Block then, got {:?}", other),
+                }
+                assert!(e.else_branch.is_none());
+            }
+            other => panic!("expected If for `if true {{ 1 }}`, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+
+        // if true { 1i32 } else { 2i32 } → Expr::If with else_branch = Some(Block)
+        let mut p = Parser::new(vec![
+            tok(TokenKind::If),
+            tok(TokenKind::True),
+            tok(TokenKind::LBrace),
+            int_tok(1),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Else),
+            tok(TokenKind::LBrace),
+            int_tok(2),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::If(e)) => {
+                let else_e = e.else_branch.as_ref().expect("else_branch");
+                match &**else_e {
+                    Expr::Block(b) => {
+                        let tail = b.tail.as_ref().expect("tail");
+                        assert_eq!(int_value(tail), 2);
+                    }
+                    other => panic!("expected Block else_branch, got {:?}", other),
+                }
+            }
+            other => panic!(
+                "expected If for `if true {{ 1 }} else {{ 2 }}`, got {:?}",
+                other
+            ),
+        }
+        assert!(p.errors.is_empty());
+
+        // if true { 1i32 } else if false { 2i32 } else { 3i32 }
+        let mut p = Parser::new(vec![
+            tok(TokenKind::If),
+            tok(TokenKind::True),
+            tok(TokenKind::LBrace),
+            int_tok(1),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Else),
+            tok(TokenKind::If),
+            tok(TokenKind::False),
+            tok(TokenKind::LBrace),
+            int_tok(2),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Else),
+            tok(TokenKind::LBrace),
+            int_tok(3),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::If(outer)) => {
+                let outer_else = outer.else_branch.as_ref().expect("outer else");
+                match &**outer_else {
+                    Expr::If(inner) => {
+                        match &*inner.cond {
+                            Expr::BoolLit(b) => assert!(!b.value),
+                            other => panic!("expected BoolLit inner cond, got {:?}", other),
+                        }
+                        match &*inner.then {
+                            Expr::Block(b) => {
+                                let tail = b.tail.as_ref().expect("tail");
+                                assert_eq!(int_value(tail), 2);
+                            }
+                            other => panic!("expected Block inner then, got {:?}", other),
+                        }
+                        let inner_else = inner.else_branch.as_ref().expect("inner else");
+                        match &**inner_else {
+                            Expr::Block(b) => {
+                                let tail = b.tail.as_ref().expect("tail");
+                                assert_eq!(int_value(tail), 3);
+                            }
+                            other => panic!("expected Block inner else, got {:?}", other),
+                        }
+                    }
+                    other => panic!("expected If as outer else_branch, got {:?}", other),
+                }
+            }
+            other => panic!("expected outer If for else-if chain, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+
+        // Error: if true 1i32 (non-block then)
+        let mut p = Parser::new(vec![
+            tok(TokenKind::If),
+            tok(TokenKind::True),
+            int_tok(1),
+            tok(TokenKind::Eof),
+        ]);
+        assert!(p.parse_expr().is_err());
+
+        // Error: if true { 1i32 } else 2i32 (non-block else)
+        let mut p = Parser::new(vec![
+            tok(TokenKind::If),
+            tok(TokenKind::True),
+            tok(TokenKind::LBrace),
+            int_tok(1),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Else),
+            int_tok(2),
             tok(TokenKind::Eof),
         ]);
         assert!(p.parse_expr().is_err());
