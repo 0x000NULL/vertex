@@ -241,3 +241,7 @@
 ==> plan  add-control-flow-variants-to-expr
       plan: 47.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-control-flow-variants-to-expr-plan-20260427T042345641.txt
 ==> exec  add-control-flow-variants-to-expr
+      exec: 64.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-control-flow-variants-to-expr-execute-20260427T042449672.txt
+      notes: - Placed the `Pat` placeholder enum immediately after the `Stmt` placeholder (rather than between `CastTy` and `ClosureParam`) — kept it grouped with the other `// TODO: replaced by ...` placeholders, which already form a contiguous block. / - Placed `MatchArm` directly after `Match` (rather than at the end of the per-variant struct list) so the related types are co-located; it is not an `Expr` variant itself, so this does not affect dispatch.
+    [38/113] add-control-flow-variants-to-expr: plan $0.29 / execute $0.46 / verified / committed bb81510
+==> plan  define-type-enum-in-src-ast-ty-rs

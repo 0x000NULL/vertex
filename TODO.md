@@ -281,7 +281,7 @@
   - [ ] Define `MatchArm { pattern, guard, body, span, id }`
   - [ ] **Verify:** `cargo build`
 
-- [ ] Define `Type` enum in `src/ast/ty.rs`
+- [x] Define `Type` enum in `src/ast/ty.rs`
   - [ ] Variants: `Path(Path), Ref { mutable, ty, span, id }, Ptr { mutable, ty }, Array { elem, len }, Slice { elem }, Tuple(Vec<Type>), Fn { params, ret }, Infer`
   - [ ] **Verify:** `cargo build`; `grep -q 'pub enum Type' src/ast/ty.rs`
 
