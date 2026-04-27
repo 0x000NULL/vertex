@@ -141,7 +141,7 @@
 
 ## 4. Scanner
 
-- [ ] Implement `Scanner` struct in `src/lexer/scan.rs`
+- [x] Implement `Scanner` struct in `src/lexer/scan.rs`
   - [ ] Fields: `src: &'a str`, `bytes: &'a [u8]`, `pos: usize`, `file_id: FileId`
   - [ ] Methods: `pub fn new(src, file_id)`, helpers `peek`, `peek_at`, `bump`, `eat_while`
   - [ ] **Verify:** `cargo build`; `grep -q 'pub struct Scanner' src/lexer/scan.rs`

@@ -74,3 +74,9 @@
 ==> exec  add-identifier-and-operator-variants-to-tokenkind
       exec: 24.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-identifier-and-operator-variants-to-tokenkind-execute-20260427T030931939.txt
       notes: - Appended new variants strictly after the existing literal variants in the order specified by the plan (Ident → operators → punctuation → specials), preserving the existing `#[derive(Debug, Clone, PartialEq)]` and not touching `IntSuffix`/`FloatSuffix`. / - No other items were added; no existing variants were re-ordered or renamed.
+    [10/113] add-identifier-and-operator-variants-to-tokenkind: plan $0.19 / execute $0.20 / verified / committed 6c2cc74
+==> plan  define-token-struct
+      plan: 39.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-token-struct-plan-20260427T031011802.txt
+==> exec  define-token-struct
+      exec: 46.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-token-struct-execute-20260427T031057854.txt
+      notes: - Followed the plan exactly: added `use crate::span::Span;` at the top of `token.rs`, appended `Token` struct with `#[derive(Debug, Clone)]`, and added a `new(kind, span)` constructor. / - Did not derive `PartialEq` on `Token` (consistent with the plan's rationale — `TokenKind::FloatLiteral` carries `f64` which is not `Eq`, and skipping it keeps the surface minimal).
