@@ -579,3 +579,11 @@
       notes: - Placed `parse_mod` and `parse_mod_inline_item` immediately after `parse_trait_method` inside the existing `impl Parser` block — most-conservative placement to avoid restructuring. / - For the inline-mod body, I followed the plan literally: when an unsupported leading token appears, propagate the `expect_one_of` error (no `recover_to_sync` call), keeping the current `parse_mod` call's error path clean.
     [38/72] parse-mod-foo-file-loaded-vs-mod-foo-inline: plan $0.65 / execute $0.88 / verified / committed fe395fc
 ==> plan  parse-use-items-simple-paths
+      plan: 109.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-use-items-simple-paths-plan-20260427T081250519.txt
+==> exec  parse-use-items-simple-paths
+      exec: 93.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-use-items-simple-paths-execute-20260427T081423556.txt
+      notes: - For the optional `as` alias, used `if let TokenKind::Ident(s) = self.peek().clone() { if s == "as" { ... } }` per the plan's guidance. Cloning the peeked `TokenKind` (cheap String clone since the token is immediately consumed) lets us release the immutable borrow before calling `self.bump()`. / - Inside the conditional `as` branch, used a nested `if` rather than an `&&` guard in the pattern (works on stable, no `let_chains` needed).
+    [39/72] parse-use-items-simple-paths: plan $0.95 / execute $0.83 / verified / committed 6d9a538
+==> plan  parse-use-items-nested-glob
+      plan: 132.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-use-items-nested-glob-plan-20260427T081637387.txt
+==> exec  parse-use-items-nested-glob

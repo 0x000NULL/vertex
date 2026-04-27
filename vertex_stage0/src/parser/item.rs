@@ -2,7 +2,7 @@ use crate::ast::expr::{Expr, GenericArg, IntLit, Path, PathSegment};
 use crate::ast::generics::{Generics, TraitBound, TypeParam, WhereClause, WherePred};
 use crate::ast::item::{
     EnumDef, EnumVariant, Field, FnDef, Item, ModDef, ModKind, Param, StructDef, StructKind,
-    TraitDef, TraitItem, TraitItemConst, TraitItemFn, TraitItemType, UseDef, VariantKind,
+    TraitDef, TraitItem, TraitItemConst, TraitItemFn, TraitItemType, UseDef, UseTree, VariantKind,
 };
 use crate::ast::ty::Type;
 use crate::error::{CompileError, ErrorCode, ErrorKind};
@@ -946,9 +946,41 @@ impl Parser {
         }))
     }
 
+    // Local `pub` handling here will be subsumed by the dedicated visibility item.
     pub fn parse_use(&mut self) -> Result<Item, CompileError> {
+        let mut is_pub = false;
+        let mut start_span: Option<Span> = None;
+        if matches!(self.peek(), TokenKind::Pub) {
+            let pub_tok = self.bump();
+            is_pub = true;
+            start_span = Some(pub_tok.span);
+        }
         let use_kw = self.expect(&TokenKind::Use)?;
-        let start_span = use_kw.span;
+        let start_span = start_span.unwrap_or(use_kw.span);
+
+        let tree = self.parse_use_tree()?;
+
+        let semi_tok = self.expect(&TokenKind::Semi)?;
+        let end_span = semi_tok.span;
+
+        let span = start_span.merge(&end_span);
+        let id = self.new_node_id();
+        Ok(Item::Use(UseDef {
+            id,
+            span,
+            is_pub,
+            tree,
+        }))
+    }
+
+    fn parse_use_tree(&mut self) -> Result<UseTree, CompileError> {
+        if matches!(self.peek(), TokenKind::LBrace) {
+            let items = self.parse_use_tree_group()?;
+            return Ok(UseTree::Nested {
+                segments: Vec::new(),
+                items,
+            });
+        }
 
         let mut segments: Vec<String> = Vec::new();
         let head_tok = self.expect(&TokenKind::Ident(String::new()))?;
@@ -957,10 +989,22 @@ impl Parser {
             _ => unreachable!(),
         }
         while self.eat(&TokenKind::ColonColon) {
-            let seg_tok = self.expect(&TokenKind::Ident(String::new()))?;
-            match seg_tok.kind {
-                TokenKind::Ident(s) => segments.push(s),
-                _ => unreachable!(),
+            match self.peek() {
+                TokenKind::Star => {
+                    self.bump();
+                    return Ok(UseTree::Glob { segments });
+                }
+                TokenKind::LBrace => {
+                    let items = self.parse_use_tree_group()?;
+                    return Ok(UseTree::Nested { segments, items });
+                }
+                _ => {
+                    let seg_tok = self.expect(&TokenKind::Ident(String::new()))?;
+                    match seg_tok.kind {
+                        TokenKind::Ident(s) => segments.push(s),
+                        _ => unreachable!(),
+                    }
+                }
             }
         }
 
@@ -976,17 +1020,26 @@ impl Parser {
             }
         }
 
-        let semi_tok = self.expect(&TokenKind::Semi)?;
-        let end_span = semi_tok.span;
+        Ok(UseTree::Simple { segments, alias })
+    }
 
-        let span = start_span.merge(&end_span);
-        let id = self.new_node_id();
-        Ok(Item::Use(UseDef {
-            id,
-            span,
-            segments,
-            alias,
-        }))
+    fn parse_use_tree_group(&mut self) -> Result<Vec<UseTree>, CompileError> {
+        self.expect(&TokenKind::LBrace)?;
+        let mut items: Vec<UseTree> = Vec::new();
+        if !matches!(self.peek(), TokenKind::RBrace) {
+            loop {
+                let item = self.parse_use_tree()?;
+                items.push(item);
+                if !self.eat(&TokenKind::Comma) {
+                    break;
+                }
+                if matches!(self.peek(), TokenKind::RBrace) {
+                    break;
+                }
+            }
+        }
+        self.expect(&TokenKind::RBrace)?;
+        Ok(items)
     }
 
     fn parse_mod_inline_item(&mut self) -> Result<Item, CompileError> {
@@ -1973,8 +2026,14 @@ mod tests {
             tok(TokenKind::Eof),
         ]);
         let u = as_use(p.parse_use().expect("parse_use"));
-        assert_eq!(u.segments, vec!["foo".to_string(), "bar".to_string()]);
-        assert!(u.alias.is_none());
+        assert!(!u.is_pub);
+        match &u.tree {
+            UseTree::Simple { segments, alias } => {
+                assert_eq!(*segments, vec!["foo".to_string(), "bar".to_string()]);
+                assert!(alias.is_none());
+            }
+            other => panic!("expected UseTree::Simple, got {:?}", other),
+        }
         assert!(p.errors.is_empty());
         assert!(matches!(p.peek(), TokenKind::Eof));
 
@@ -1990,8 +2049,129 @@ mod tests {
             tok(TokenKind::Eof),
         ]);
         let u = as_use(p.parse_use().expect("parse_use"));
-        assert_eq!(u.segments, vec!["foo".to_string(), "bar".to_string()]);
-        assert_eq!(u.alias, Some("baz".to_string()));
+        assert!(!u.is_pub);
+        match &u.tree {
+            UseTree::Simple { segments, alias } => {
+                assert_eq!(*segments, vec!["foo".to_string(), "bar".to_string()]);
+                assert_eq!(*alias, Some("baz".to_string()));
+            }
+            other => panic!("expected UseTree::Simple, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+    }
+
+    #[test]
+    fn use_nested_glob_pub() {
+        // use { a, b::c, d::{e, f} };
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Use),
+            tok(TokenKind::LBrace),
+            ident_tok("a"),
+            tok(TokenKind::Comma),
+            ident_tok("b"),
+            tok(TokenKind::ColonColon),
+            ident_tok("c"),
+            tok(TokenKind::Comma),
+            ident_tok("d"),
+            tok(TokenKind::ColonColon),
+            tok(TokenKind::LBrace),
+            ident_tok("e"),
+            tok(TokenKind::Comma),
+            ident_tok("f"),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Semi),
+            tok(TokenKind::Eof),
+        ]);
+        let u = as_use(p.parse_use().expect("parse_use"));
+        assert!(!u.is_pub);
+        match &u.tree {
+            UseTree::Nested { segments, items } => {
+                assert!(segments.is_empty());
+                assert_eq!(items.len(), 3);
+                match &items[0] {
+                    UseTree::Simple { segments, alias } => {
+                        assert_eq!(*segments, vec!["a".to_string()]);
+                        assert!(alias.is_none());
+                    }
+                    other => panic!("expected items[0] UseTree::Simple, got {:?}", other),
+                }
+                match &items[1] {
+                    UseTree::Simple { segments, alias } => {
+                        assert_eq!(*segments, vec!["b".to_string(), "c".to_string()]);
+                        assert!(alias.is_none());
+                    }
+                    other => panic!("expected items[1] UseTree::Simple, got {:?}", other),
+                }
+                match &items[2] {
+                    UseTree::Nested { segments, items } => {
+                        assert_eq!(*segments, vec!["d".to_string()]);
+                        assert_eq!(items.len(), 2);
+                        match &items[0] {
+                            UseTree::Simple { segments, alias } => {
+                                assert_eq!(*segments, vec!["e".to_string()]);
+                                assert!(alias.is_none());
+                            }
+                            other => {
+                                panic!("expected nested items[0] UseTree::Simple, got {:?}", other)
+                            }
+                        }
+                        match &items[1] {
+                            UseTree::Simple { segments, alias } => {
+                                assert_eq!(*segments, vec!["f".to_string()]);
+                                assert!(alias.is_none());
+                            }
+                            other => {
+                                panic!("expected nested items[1] UseTree::Simple, got {:?}", other)
+                            }
+                        }
+                    }
+                    other => panic!("expected items[2] UseTree::Nested, got {:?}", other),
+                }
+            }
+            other => panic!("expected UseTree::Nested, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // use foo::*;
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Use),
+            ident_tok("foo"),
+            tok(TokenKind::ColonColon),
+            tok(TokenKind::Star),
+            tok(TokenKind::Semi),
+            tok(TokenKind::Eof),
+        ]);
+        let u = as_use(p.parse_use().expect("parse_use"));
+        assert!(!u.is_pub);
+        match &u.tree {
+            UseTree::Glob { segments } => {
+                assert_eq!(*segments, vec!["foo".to_string()]);
+            }
+            other => panic!("expected UseTree::Glob, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // pub use bar;
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Pub),
+            tok(TokenKind::Use),
+            ident_tok("bar"),
+            tok(TokenKind::Semi),
+            tok(TokenKind::Eof),
+        ]);
+        let u = as_use(p.parse_use().expect("parse_use"));
+        assert!(u.is_pub);
+        match &u.tree {
+            UseTree::Simple { segments, alias } => {
+                assert_eq!(*segments, vec!["bar".to_string()]);
+                assert!(alias.is_none());
+            }
+            other => panic!("expected UseTree::Simple, got {:?}", other),
+        }
         assert!(p.errors.is_empty());
         assert!(matches!(p.peek(), TokenKind::Eof));
     }

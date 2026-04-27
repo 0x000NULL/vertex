@@ -494,7 +494,7 @@
   - [ ] `use foo::bar;`, `use foo::bar as baz;`
   - [ ] **Verify:** `cargo test --lib parser::item::tests::use_simple_and_alias`
 
-- [ ] Parse `use` items — nested + glob
+- [x] Parse `use` items — nested + glob
   - [ ] `use { a, b::c, d::{e, f} };`, `use foo::*;`, `pub use bar;`
   - [ ] **Verify:** `cargo test --lib parser::item::tests::use_nested_glob_pub`
 

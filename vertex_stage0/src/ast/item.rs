@@ -161,11 +161,27 @@ pub struct ModDef {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
+pub enum UseTree {
+    Simple {
+        segments: Vec<String>,
+        alias: Option<String>,
+    },
+    Glob {
+        segments: Vec<String>,
+    },
+    Nested {
+        segments: Vec<String>,
+        items: Vec<UseTree>,
+    },
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub struct UseDef {
     pub id: NodeId,
     pub span: Span,
-    pub segments: Vec<String>,
-    pub alias: Option<String>,
+    pub is_pub: bool,
+    pub tree: UseTree,
 }
 
 #[allow(dead_code)]
