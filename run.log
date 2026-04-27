@@ -212,3 +212,16 @@
 ==> exec  define-item-enum-in-src-ast-item-rs
       exec: 43.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-item-enum-in-src-ast-item-rs-execute-20260427T041450390.txt
       notes: - Plan step 4 said the `id`/`span` accessors would silence per-field `dead_code` "without needing `#[allow(dead_code)]` per field," but step 2 explicitly required `#[allow(dead_code)]` on each struct. I followed step 2 literally and placed `#[allow(dead_code)]` on every struct (and the enum, per step 3). The current `cargo build` shows zero warnings either way. / - Plan step 3 contained a self-correcting sentence about variant naming; I used the final list it specified (`Const`, `Static`, `TypeAlias`).
+    [33/113] define-item-enum-in-src-ast-item-rs: plan $0.58 / execute $0.41 / verified / committed 7655463
+==> plan  define-stmt-enum-in-src-ast-stmt-rs
+      plan: 75.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-stmt-enum-in-src-ast-stmt-rs-plan-20260427T041606496.txt
+    [34/113] define-stmt-enum-in-src-ast-stmt-rs: 1 cross-item, 1 local blockers -> needs-review
+        [cross-item] Will the runner honor the Prereqs section and ensure `Expr`, `Ty`, and `Pattern` modules exist before this item executes?
+          default: If a prereq is missing at execute time, land a minimal placeholder module (e.g. `pub enum Pattern {}` in `pat.rs`, same for `expr.rs` and `ty.rs`) inline as part of this commit, so `Stmt` compiles. Accept that the dedicated prereq items may need to merge into / overwrite those placeholders later.
+        [local] Is the type named `Pattern` (per the spec wording) or `Pat` (a common shorter convention also hinted at by `pat.rs`)?
+          default: Use `Pattern` since the task spec writes `pattern: Pattern` explicitly; if the prereq lands `Pat`, follow that and update the field type to `Pat`.
+==> plan  define-expr-enum-in-src-ast-expr-rs-literal-path-variants
+      plan: 86.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-expr-enum-in-src-ast-expr-rs-literal-path-variants-plan-20260427T041732565.txt
+==> exec  define-expr-enum-in-src-ast-expr-rs-literal-path-variants
+      exec: 46.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-expr-enum-in-src-ast-expr-rs-literal-path-variants-execute-20260427T041818609.txt
+      notes: - The plan said "all `#[allow(dead_code)] #[derive(Debug, Clone)]` to match the `item.rs` convention" — I applied this attribute pair to every new struct/enum in the file (literal structs, `Path`, `PathSegment`, `GenericArg`, and `Expr`) to be consistent and avoid dead-code warnings, even though the plan listed it explicitly only on the literal structs. / - For the `GenericArg` placeholder enum, the plan's inline-comment example used `/* filled in by ... */` and a separate `// TODO`. I rendered the TODO as a `//` line comment above the enum and gave it a single `Placeholder` variant, per the plan's later "Assumptions" wording.

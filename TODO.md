@@ -268,7 +268,7 @@
   - [ ] Every variant carries `id: NodeId, span: Span`
   - [ ] **Verify:** `cargo build`; `grep -q 'IntLit' src/ast/expr.rs`
 
-- [ ] Add operator + control-flow variants to `Expr`
+- [x] Add operator + control-flow variants to `Expr`
   - [ ] `Unary { op, operand }, Binary { op, lhs, rhs }, Call { callee, args }, MethodCall { receiver, method, args, generic_args }, Field { receiver, name }, TupleField { receiver, idx }, Index { receiver, idx }, Cast { expr, ty }, Try { expr }`
   - [ ] **Verify:** `cargo build`
 

@@ -67,6 +67,136 @@ pub enum GenericArg {
     Placeholder,
 }
 
+// TODO: replaced by define-type-enum-in-src-ast-ty-rs
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub enum CastTy {
+    Placeholder,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnaryOp {
+    Neg,
+    Not,
+    BitNot,
+    Deref,
+    Ref,
+    RefMut,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BinaryOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    Eq,
+    Ne,
+    Lt,
+    Gt,
+    Le,
+    Ge,
+    And,
+    Or,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Shl,
+    Shr,
+    Assign,
+    AddAssign,
+    SubAssign,
+    MulAssign,
+    DivAssign,
+    RemAssign,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct Unary {
+    pub id: NodeId,
+    pub span: Span,
+    pub op: UnaryOp,
+    pub operand: Box<Expr>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct Binary {
+    pub id: NodeId,
+    pub span: Span,
+    pub op: BinaryOp,
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct Call {
+    pub id: NodeId,
+    pub span: Span,
+    pub callee: Box<Expr>,
+    pub args: Vec<Expr>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct MethodCall {
+    pub id: NodeId,
+    pub span: Span,
+    pub receiver: Box<Expr>,
+    pub method: String,
+    pub args: Vec<Expr>,
+    pub generic_args: Vec<GenericArg>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct FieldAccess {
+    pub id: NodeId,
+    pub span: Span,
+    pub receiver: Box<Expr>,
+    pub name: String,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct TupleFieldAccess {
+    pub id: NodeId,
+    pub span: Span,
+    pub receiver: Box<Expr>,
+    pub idx: u32,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct Index {
+    pub id: NodeId,
+    pub span: Span,
+    pub receiver: Box<Expr>,
+    pub idx: Box<Expr>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct Cast {
+    pub id: NodeId,
+    pub span: Span,
+    pub expr: Box<Expr>,
+    pub ty: Box<CastTy>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct Try {
+    pub id: NodeId,
+    pub span: Span,
+    pub expr: Box<Expr>,
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -76,6 +206,15 @@ pub enum Expr {
     StrLit(StrLit),
     BoolLit(BoolLit),
     Path(Path),
+    Unary(Unary),
+    Binary(Binary),
+    Call(Call),
+    MethodCall(MethodCall),
+    Field(FieldAccess),
+    TupleField(TupleFieldAccess),
+    Index(Index),
+    Cast(Cast),
+    Try(Try),
 }
 
 impl Expr {
@@ -87,6 +226,15 @@ impl Expr {
             Expr::StrLit(e) => e.id,
             Expr::BoolLit(e) => e.id,
             Expr::Path(e) => e.id,
+            Expr::Unary(e) => e.id,
+            Expr::Binary(e) => e.id,
+            Expr::Call(e) => e.id,
+            Expr::MethodCall(e) => e.id,
+            Expr::Field(e) => e.id,
+            Expr::TupleField(e) => e.id,
+            Expr::Index(e) => e.id,
+            Expr::Cast(e) => e.id,
+            Expr::Try(e) => e.id,
         }
     }
 
@@ -98,6 +246,15 @@ impl Expr {
             Expr::StrLit(e) => e.span,
             Expr::BoolLit(e) => e.span,
             Expr::Path(e) => e.span,
+            Expr::Unary(e) => e.span,
+            Expr::Binary(e) => e.span,
+            Expr::Call(e) => e.span,
+            Expr::MethodCall(e) => e.span,
+            Expr::Field(e) => e.span,
+            Expr::TupleField(e) => e.span,
+            Expr::Index(e) => e.span,
+            Expr::Cast(e) => e.span,
+            Expr::Try(e) => e.span,
         }
     }
 }
