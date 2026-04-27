@@ -258,7 +258,7 @@
   - [ ] Every node carries `id: NodeId, span: Span`
   - [ ] **Verify:** `cargo build`; `grep -q 'pub enum Item' src/ast/item.rs`
 
-- [ ] Define `Stmt` enum in `src/ast/stmt.rs`
+- [x] Define `Stmt` enum in `src/ast/stmt.rs`
   - [ ] Variants: `Let { pattern, ty, init, span, id }`, `Expr(Expr, has_semi: bool)`, `Item(Item)`
   - [ ] **Verify:** `cargo build`; `grep -q 'pub enum Stmt' src/ast/stmt.rs`
 

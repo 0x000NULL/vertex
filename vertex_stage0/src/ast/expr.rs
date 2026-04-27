@@ -1,4 +1,4 @@
-use crate::ast::NodeId;
+use crate::ast::{NodeId, Stmt};
 use crate::lexer::token::{FloatSuffix, IntSuffix};
 use crate::span::Span;
 
@@ -78,13 +78,6 @@ pub enum CastTy {
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum ClosureParam {
-    Placeholder,
-}
-
-// TODO: replaced by define-stmt-enum-in-src-ast-stmt-rs
-#[allow(dead_code)]
-#[derive(Debug, Clone)]
-pub enum Stmt {
     Placeholder,
 }
 
