@@ -122,3 +122,13 @@
 ==> exec  implement-raw-string-literal-scanning
       exec: 89.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-raw-string-literal-scanning-execute-20260427T032859209.txt
       notes: - The plan suggested using `peek_at(1..=hash_count)` style; I used a simple `for i in 0..hash_count { peek_at(1 + i) }` loop since `peek_at` takes a single `usize`. Behavior is identical. / - For the embedded-newline happy case I used `r"a\nb"` (the source string `"r\"a\nb\""` containing a single literal newline byte) per the plan's "embedded actual newline" example. The plan's text mentioned both a `\n`-as-escape-text variant and a literal-newline variant; I included `r"\n"` (literal backslash-n preserved) and `r"a\nb"` (literal newline byte preserved) to cover both.
+    [18/113] implement-raw-string-literal-scanning: plan $0.32 / execute $0.57 / verified / committed c17f03f
+==> plan  implement-line-and-block-comment-scanning
+      plan: 73.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-line-and-block-comment-scanning-plan-20260427T033012886.txt
+==> exec  implement-line-and-block-comment-scanning
+      exec: 60.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-line-and-block-comment-scanning-execute-20260427T033112945.txt
+      notes: - Treated `/**` and `/*!` as **normal** block comments (not deferred to a doc-comment scanner), per the plan's Assumptions section ("`/**` and `/*!` block-doc forms: treated as **normal** block comments here"). This matched the verify test's `/*/*/*x*/*/*/Z` case, where the inner `/*` runs collide with `/**` and `/*` patterns and the outer-level scanner needs to count them as nesting levels rather than rejecting the whole input. / - Used a 2-byte lookahead via `(self.peek(), self.peek_at(1))` for marker detection inside the block-comment loop. When a `*` or `/` appears as the final byte, it falls into the single-byte advance arm, then the next iteration hits EOF and rewinds — matching the rewind-on-failure pattern documented in the plan.
+    [19/113] implement-line-and-block-comment-scanning: plan $0.46 / execute $0.42 / verified / committed 1caea1f
+==> plan  implement-doc-comment-scanning
+      plan: 69.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-doc-comment-scanning-plan-20260427T033222982.txt
+==> exec  implement-doc-comment-scanning

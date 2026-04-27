@@ -1,3 +1,4 @@
+use crate::lexer::token::DocStyle;
 use crate::lexer::token::FloatSuffix;
 use crate::lexer::token::IntSuffix;
 use crate::span::FileId;
@@ -450,6 +451,28 @@ impl<'a> Scanner<'a> {
         }
     }
 
+    pub fn scan_doc_comment(&mut self) -> Option<(String, DocStyle, Span)> {
+        if self.peek() != Some(b'/') || self.peek_at(1) != Some(b'/') {
+            return None;
+        }
+        let style = match self.peek_at(2) {
+            Some(b'/') => DocStyle::Outer,
+            Some(b'!') => DocStyle::Inner,
+            _ => return None,
+        };
+
+        let start = self.pos;
+        self.pos += 3;
+
+        let content_start = self.pos;
+        self.eat_while(|b| b != b'\n');
+        let content_end = self.pos;
+
+        let content = String::from(&self.src[content_start..content_end]);
+        let span = Span::new(self.file_id, start as u32, self.pos as u32);
+        Some((content, style, span))
+    }
+
     fn scan_escape_char(&mut self) -> Option<char> {
         self.pos += 1;
         let kind = self.bump()?;
@@ -900,6 +923,69 @@ mod tests {
         let mut s = Scanner::new("abc", FileId(0));
         assert!(!s.skip_comments());
         assert_eq!(s.pos, 0);
+    }
+
+    #[test]
+    fn doc_comments_preserved() {
+        let outer_happy: &[(&str, &str, usize)] = &[
+            ("/// hello\n", " hello", "/// hello".len()),
+            ("///hello", "hello", "///hello".len()),
+            ("///\n", "", "///".len()),
+            ("///", "", "///".len()),
+            ("/// trailing", " trailing", "/// trailing".len()),
+        ];
+        for (input, expected_body, expected_pos) in outer_happy {
+            let mut s = Scanner::new(input, FileId(21));
+            let (body, style, span) = s.scan_doc_comment().expect(input);
+            assert_eq!(body, *expected_body, "body for {:?}", input);
+            assert_eq!(style, DocStyle::Outer, "style for {:?}", input);
+            assert_eq!(span.file_id, FileId(21), "file_id for {:?}", input);
+            assert_eq!(span.start, 0, "span.start for {:?}", input);
+            assert_eq!(
+                span.end as usize, *expected_pos,
+                "span.end for {:?}",
+                input
+            );
+            assert_eq!(s.pos, *expected_pos, "pos for {:?}", input);
+        }
+
+        let inner_happy: &[(&str, &str, usize)] = &[
+            ("//! crate doc\n", " crate doc", "//! crate doc".len()),
+            ("//!body", "body", "//!body".len()),
+            ("//!", "", "//!".len()),
+        ];
+        for (input, expected_body, expected_pos) in inner_happy {
+            let mut s = Scanner::new(input, FileId(22));
+            let (body, style, span) = s.scan_doc_comment().expect(input);
+            assert_eq!(body, *expected_body, "body for {:?}", input);
+            assert_eq!(style, DocStyle::Inner, "style for {:?}", input);
+            assert_eq!(span.file_id, FileId(22), "file_id for {:?}", input);
+            assert_eq!(span.start, 0, "span.start for {:?}", input);
+            assert_eq!(
+                span.end as usize, *expected_pos,
+                "span.end for {:?}",
+                input
+            );
+            assert_eq!(s.pos, *expected_pos, "pos for {:?}", input);
+        }
+
+        let rejections: &[&str] = &[
+            "// regular\n",
+            "//\n",
+            "/* block */",
+            "abc",
+            "/",
+            "",
+        ];
+        for input in rejections {
+            let mut s = Scanner::new(input, FileId(0));
+            assert!(
+                s.scan_doc_comment().is_none(),
+                "expected None for {:?}",
+                input
+            );
+            assert_eq!(s.pos, 0, "expected pos=0 after rejecting {:?}", input);
+        }
     }
 
     #[test]

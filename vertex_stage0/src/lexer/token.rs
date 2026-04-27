@@ -22,6 +22,12 @@ pub enum FloatSuffix {
     Unsuffixed,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DocStyle {
+    Outer,
+    Inner,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
     Break,
@@ -61,6 +67,7 @@ pub enum TokenKind {
     CharLiteral(char),
     StringLiteral(String),
     RawStringLiteral(String),
+    DocComment(String, DocStyle),
     Ident(String),
     Plus,
     Minus,

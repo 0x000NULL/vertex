@@ -182,7 +182,7 @@
   - [ ] `// ... \n` and `/* ... */` with proper nesting depth counter
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::nested_block_comments`
 
-- [ ] Implement doc comment scanning
+- [x] Implement doc comment scanning
   - [ ] Recognize `/// ...` (outer) and `//! ...` (inner) — emit them as `TokenKind::DocComment(String, DocStyle)` instead of dropping
   - [ ] Define `DocStyle` enum in `token.rs`: `Outer, Inner`
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::doc_comments_preserved`
