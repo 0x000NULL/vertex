@@ -276,7 +276,7 @@
   - [ ] `Range { start, end, inclusive }, Closure { params, body, move_kw }, StructLit { path, fields, base }, TupleLit { elems }, ArrayLit { elems }, ArrayRepeat { value, count }, Block { stmts, tail }`
   - [ ] **Verify:** `cargo build`
 
-- [ ] Add control-flow variants to `Expr`
+- [x] Add control-flow variants to `Expr`
   - [ ] `If { cond, then, else_branch }, Loop { body }, While { cond, body }, For { pat, iter, body }, Match { scrutinee, arms }, Return { value }, Break { label, value }, Continue { label }`
   - [ ] Define `MatchArm { pattern, guard, body, span, id }`
   - [ ] **Verify:** `cargo build`

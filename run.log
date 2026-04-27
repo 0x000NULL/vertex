@@ -231,3 +231,13 @@
 ==> exec  add-operator-control-flow-variants-to-expr
       exec: 55.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-operator-control-flow-variants-to-expr-execute-20260427T042043689.txt
       notes: - For `UnaryOp`, included the plan-specified variants (`Neg`, `Not`, `Deref`, `Ref`, `RefMut`) plus `BitNot` as documented in the plan's Assumptions section ("`Bitwise `~` from spec §2 is included as `BitNot` as well … including for completeness"). / - For `BinaryOp`, included the explicit operators called out in step 1: arithmetic (`Add`, `Sub`, `Mul`, `Div`, `Rem`), comparison (`Eq`, `Ne`, `Lt`, `Gt`, `Le`, `Ge`), logical (`And`, `Or`), bitwise (`BitAnd`, `BitOr`, `BitXor`, `Shl`, `Shr`), and assignment (`Assign`, `AddAssign`, `SubAssign`, `MulAssign`, `DivAssign`, `RemAssign`). Did not add additional bitwise-assign variants (`<<=`, `>>=`, `&=`, `|=`, `^=`) since the plan's assignment list explicitly enumerates only the six arithmetic-assignment operators.
+    [36/113] add-operator-control-flow-variants-to-expr: plan $0.44 / execute $0.40 / verified / committed 1f0bdf5
+==> plan  add-aggregate-literal-construction-variants-to-expr
+      plan: 71.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-aggregate-literal-construction-variants-to-expr-plan-20260427T042155645.txt
+==> exec  add-aggregate-literal-construction-variants-to-expr
+      exec: 62.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-aggregate-literal-construction-variants-to-expr-execute-20260427T042257693.txt
+      notes: - No ambiguous interpretations encountered. Followed the plan literally: placeholder enums (`ClosureParam`, `Stmt`) and `StructLitField` sub-node placed immediately after `CastTy` (preserving the placeholder grouping); seven new per-variant structs placed after `Try` in the listed order; new variants appended to `Expr` enum and to both `id()` / `span()` match arms in matching order. All new items use `#[allow(dead_code)] #[derive(Debug, Clone)]` per the existing convention.
+    [37/113] add-aggregate-literal-construction-variants-to-expr: plan $0.41 / execute $0.39 / verified / committed 53f0e89
+==> plan  add-control-flow-variants-to-expr
+      plan: 47.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-control-flow-variants-to-expr-plan-20260427T042345641.txt
+==> exec  add-control-flow-variants-to-expr

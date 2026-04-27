@@ -88,6 +88,13 @@ pub enum Stmt {
     Placeholder,
 }
 
+// TODO: replaced by define-pattern-enum-in-src-ast-pat-rs
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub enum Pat {
+    Placeholder,
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct StructLitField {
@@ -284,6 +291,87 @@ pub struct Block {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
+pub struct If {
+    pub id: NodeId,
+    pub span: Span,
+    pub cond: Box<Expr>,
+    pub then: Box<Expr>,
+    pub else_branch: Option<Box<Expr>>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct Loop {
+    pub id: NodeId,
+    pub span: Span,
+    pub body: Box<Expr>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct While {
+    pub id: NodeId,
+    pub span: Span,
+    pub cond: Box<Expr>,
+    pub body: Box<Expr>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct For {
+    pub id: NodeId,
+    pub span: Span,
+    pub pat: Pat,
+    pub iter: Box<Expr>,
+    pub body: Box<Expr>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct Match {
+    pub id: NodeId,
+    pub span: Span,
+    pub scrutinee: Box<Expr>,
+    pub arms: Vec<MatchArm>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct MatchArm {
+    pub id: NodeId,
+    pub span: Span,
+    pub pattern: Pat,
+    pub guard: Option<Box<Expr>>,
+    pub body: Box<Expr>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct Return {
+    pub id: NodeId,
+    pub span: Span,
+    pub value: Option<Box<Expr>>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct Break {
+    pub id: NodeId,
+    pub span: Span,
+    pub label: Option<String>,
+    pub value: Option<Box<Expr>>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct Continue {
+    pub id: NodeId,
+    pub span: Span,
+    pub label: Option<String>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     IntLit(IntLit),
     FloatLit(FloatLit),
@@ -307,6 +395,14 @@ pub enum Expr {
     ArrayLit(ArrayLit),
     ArrayRepeat(ArrayRepeat),
     Block(Block),
+    If(If),
+    Loop(Loop),
+    While(While),
+    For(For),
+    Match(Match),
+    Return(Return),
+    Break(Break),
+    Continue(Continue),
 }
 
 impl Expr {
@@ -334,6 +430,14 @@ impl Expr {
             Expr::ArrayLit(e) => e.id,
             Expr::ArrayRepeat(e) => e.id,
             Expr::Block(e) => e.id,
+            Expr::If(e) => e.id,
+            Expr::Loop(e) => e.id,
+            Expr::While(e) => e.id,
+            Expr::For(e) => e.id,
+            Expr::Match(e) => e.id,
+            Expr::Return(e) => e.id,
+            Expr::Break(e) => e.id,
+            Expr::Continue(e) => e.id,
         }
     }
 
@@ -361,6 +465,14 @@ impl Expr {
             Expr::ArrayLit(e) => e.span,
             Expr::ArrayRepeat(e) => e.span,
             Expr::Block(e) => e.span,
+            Expr::If(e) => e.span,
+            Expr::Loop(e) => e.span,
+            Expr::While(e) => e.span,
+            Expr::For(e) => e.span,
+            Expr::Match(e) => e.span,
+            Expr::Return(e) => e.span,
+            Expr::Break(e) => e.span,
+            Expr::Continue(e) => e.span,
         }
     }
 }
