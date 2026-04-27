@@ -192,7 +192,7 @@
   - [ ] Order: `..=` before `..` before `.`; `<<=` before `<<` before `<`; `==` before `=`; `>=` before `>`; etc.
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::operator_maximal_munch`
 
-- [ ] Implement keyword vs identifier disambiguation
+- [x] Implement keyword vs identifier disambiguation
   - [ ] Method `Scanner::scan_ident_or_keyword`
   - [ ] Read identifier; map against the 29 keywords table; otherwise emit `Ident`
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::keywords_take_priority_over_idents`

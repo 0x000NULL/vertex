@@ -564,6 +564,54 @@ impl<'a> Scanner<'a> {
         Some((kind, Span::new(self.file_id, start, self.pos as u32)))
     }
 
+    pub fn scan_ident_or_keyword(&mut self) -> Option<(TokenKind, Span)> {
+        let start = self.pos;
+        let first = self.peek()?;
+        if !first.is_ascii_alphabetic() {
+            return None;
+        }
+        self.pos += 1;
+        self.eat_while(|b| b.is_ascii_alphanumeric() || b == b'_');
+
+        let lex = &self.src[start..self.pos];
+        let kind = match lex {
+            "and" => TokenKind::And,
+            "break" => TokenKind::Break,
+            "const" => TokenKind::Const,
+            "continue" => TokenKind::Continue,
+            "else" => TokenKind::Else,
+            "enum" => TokenKind::Enum,
+            "extern" => TokenKind::Extern,
+            "false" => TokenKind::False,
+            "fn" => TokenKind::Fn,
+            "for" => TokenKind::For,
+            "if" => TokenKind::If,
+            "impl" => TokenKind::Impl,
+            "in" => TokenKind::In,
+            "let" => TokenKind::Let,
+            "loop" => TokenKind::Loop,
+            "match" => TokenKind::Match,
+            "mod" => TokenKind::Mod,
+            "mut" => TokenKind::Mut,
+            "not" => TokenKind::Not,
+            "or" => TokenKind::Or,
+            "pub" => TokenKind::Pub,
+            "return" => TokenKind::Return,
+            "self" => TokenKind::SelfLower,
+            "Self" => TokenKind::SelfUpper,
+            "struct" => TokenKind::Struct,
+            "trait" => TokenKind::Trait,
+            "true" => TokenKind::True,
+            "type" => TokenKind::Type,
+            "unsafe" => TokenKind::Unsafe,
+            "use" => TokenKind::Use,
+            "where" => TokenKind::Where,
+            "while" => TokenKind::While,
+            _ => TokenKind::Ident(lex.to_string()),
+        };
+        Some((kind, Span::new(self.file_id, start as u32, self.pos as u32)))
+    }
+
     pub fn scan_doc_comment(&mut self) -> Option<(String, DocStyle, Span)> {
         if self.peek() != Some(b'/') || self.peek_at(1) != Some(b'/') {
             return None;
@@ -1168,6 +1216,100 @@ mod tests {
             let mut s = Scanner::new(input, FileId(31));
             assert!(
                 s.scan_operator().is_none(),
+                "expected None for {:?}",
+                input
+            );
+            assert_eq!(s.pos, 0, "expected pos=0 after rejecting {:?}", input);
+        }
+    }
+
+    #[test]
+    fn keywords_take_priority_over_idents() {
+        let keyword_cases: &[(&str, TokenKind)] = &[
+            ("and", TokenKind::And),
+            ("break", TokenKind::Break),
+            ("const", TokenKind::Const),
+            ("continue", TokenKind::Continue),
+            ("else", TokenKind::Else),
+            ("enum", TokenKind::Enum),
+            ("extern", TokenKind::Extern),
+            ("false", TokenKind::False),
+            ("fn", TokenKind::Fn),
+            ("for", TokenKind::For),
+            ("if", TokenKind::If),
+            ("impl", TokenKind::Impl),
+            ("in", TokenKind::In),
+            ("let", TokenKind::Let),
+            ("loop", TokenKind::Loop),
+            ("match", TokenKind::Match),
+            ("mod", TokenKind::Mod),
+            ("mut", TokenKind::Mut),
+            ("not", TokenKind::Not),
+            ("or", TokenKind::Or),
+            ("pub", TokenKind::Pub),
+            ("return", TokenKind::Return),
+            ("self", TokenKind::SelfLower),
+            ("Self", TokenKind::SelfUpper),
+            ("struct", TokenKind::Struct),
+            ("trait", TokenKind::Trait),
+            ("true", TokenKind::True),
+            ("type", TokenKind::Type),
+            ("unsafe", TokenKind::Unsafe),
+            ("use", TokenKind::Use),
+            ("where", TokenKind::Where),
+            ("while", TokenKind::While),
+        ];
+
+        for (input, expected_kind) in keyword_cases {
+            let mut s = Scanner::new(input, FileId(41));
+            let (kind, span) = s.scan_ident_or_keyword().expect(input);
+            assert_eq!(&kind, expected_kind, "kind for {:?}", input);
+            assert_eq!(span.file_id, FileId(41), "file_id for {:?}", input);
+            assert_eq!(span.start, 0, "span.start for {:?}", input);
+            assert_eq!(span.end as usize, input.len(), "span.end for {:?}", input);
+            assert_eq!(s.pos, input.len(), "pos for {:?}", input);
+        }
+
+        let ident_cases: &[(&str, &str)] = &[
+            ("foo", "foo"),
+            ("Foo", "Foo"),
+            ("foo_bar", "foo_bar"),
+            ("x1", "x1"),
+            ("FOO", "FOO"),
+            ("fnord", "fnord"),
+            ("self_", "self_"),
+            ("Self2", "Self2"),
+            ("returnn", "returnn"),
+        ];
+
+        for (input, expected_name) in ident_cases {
+            let mut s = Scanner::new(input, FileId(42));
+            let (kind, span) = s.scan_ident_or_keyword().expect(input);
+            assert_eq!(
+                kind,
+                TokenKind::Ident((*expected_name).to_string()),
+                "kind for {:?}",
+                input
+            );
+            assert_eq!(span.file_id, FileId(42), "file_id for {:?}", input);
+            assert_eq!(span.start, 0, "span.start for {:?}", input);
+            assert_eq!(span.end as usize, input.len(), "span.end for {:?}", input);
+            assert_eq!(s.pos, input.len(), "pos for {:?}", input);
+        }
+
+        let mut boundary = Scanner::new("fn x", FileId(43));
+        let (kind, span) = boundary.scan_ident_or_keyword().expect("fn x");
+        assert_eq!(kind, TokenKind::Fn);
+        assert_eq!(span.file_id, FileId(43));
+        assert_eq!(span.start, 0);
+        assert_eq!(span.end, 2);
+        assert_eq!(boundary.pos, 2);
+
+        let rejections: &[&str] = &["_", "_foo", "1abc", "", " foo", "123", "!"];
+        for input in rejections {
+            let mut s = Scanner::new(input, FileId(0));
+            assert!(
+                s.scan_ident_or_keyword().is_none(),
                 "expected None for {:?}",
                 input
             );
