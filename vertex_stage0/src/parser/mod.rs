@@ -6,6 +6,7 @@ use crate::lexer::token::{Token, TokenKind};
 use crate::span::Span;
 
 pub mod expr;
+pub mod stmt;
 
 static EOF_KIND: TokenKind = TokenKind::Eof;
 

@@ -391,7 +391,7 @@
   - [ ] `let pat: Type = expr;`, `let pat = expr;`, `let pat: Type;` (init-less)
   - [ ] **Verify:** `cargo test --lib parser::stmt::tests::let_forms`
 
-- [ ] Parse expression statements with semicolon-significance
+- [x] Parse expression statements with semicolon-significance
   - [ ] Trailing `;` produces `Stmt::Expr(expr, true)`; without, `Stmt::Expr(expr, false)`
   - [ ] **Verify:** `cargo test --lib parser::stmt::tests::semicolon_significance`
 

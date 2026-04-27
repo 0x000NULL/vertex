@@ -216,3 +216,16 @@
 
 ---
 
+
+## parse-let-statements
+- Item: Parse `let` statements
+- Reason: cost ceiling
+- Timestamp: 2026-04-27T06:42:55.6582190Z
+
+### Detail
+```
+plan=1.2540015 exec=1.892615 total=3.1466165
+```
+
+---
+

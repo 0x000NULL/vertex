@@ -450,3 +450,17 @@
       notes: - The plan said the missing-`,` recovery should produce the `"expected `,` or `}`"` message via the existing error machinery. I implemented this by falling through to `expect(&TokenKind::RBrace)?`, which produces `"expected token, found {kind}"` (the project's stock `expect` message) — exactly as the plan's *Steps* prescribed. The "expected `,` or `}`" wording in the plan appears to be descriptive shorthand for the recovery behavior, not a literal message string. No test asserts on this message. / - Pattern stub also accepts `True` and `False` (as listed in the plan). `bool` literals are not exercised in the test, only `_`, identifier, and integer-literal patterns.
     [17/72] parse-match-expressions: plan $0.79 / execute $1.22 / verified / committed 1b8d9b2
 ==> plan  parse-return-break-continue
+      plan: 150.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-return-break-continue-plan-20260427T063206102.txt
+==> exec  parse-return-break-continue
+      exec: 206.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-return-break-continue-execute-20260427T063532143.txt
+      notes: - The plan said to inline the optional-value detection in each method; I extracted it into a small `value_terminator` helper at the bottom of the file because it's used identically by `parse_return` and `parse_break`. This is the conservative DRY interpretation — the denylist set is identical in both call sites, and the helper sits alongside the existing `range_rhs_starts_here` / `is_comparison_op` helpers, matching local style. / - The block-integration test arm needed a wildcard `other => panic!(...)` because `Stmt` has `Let` and `Item` variants in addition to `Expr`. Not literally specified by the plan (the plan only described the `Stmt::Expr` arm), but required to compile.
+    [18/72] parse-return-break-continue: plan $1.00 / execute $1.53 / verified / committed b53c4b2
+==> plan  parse-let-statements
+      plan: 190.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-let-statements-plan-20260427T063843598.txt
+==> exec  parse-let-statements
+      exec: 252.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-let-statements-execute-20260427T064255654.txt
+      notes: - The plan referenced `self.unexpected_token_error(...)` as if it were callable from `stmt.rs`, but it was declared as a private `fn` on `impl Parser` in `expr.rs`, only callable within that module. Conservative fix: changed its visibility to `pub(crate)` in `expr.rs` (no behavior change, no new helper duplicated). The free `describe_kind` helper it depends on remained private since only the method needed cross-module access. / - For the `let x: T;` test, the plan asserted `pos` advanced to EOF. After consuming `let`, `x`, `:`, `T`, `;` (5 tokens), `pos == 5` and the next token is `Eof` (index 5). Asserted `pos == 5` (i.e., positioned at EOF). Same convention used for the other positive cases.
+    [19/72] parse-let-statements: cost ceiling hit (total=3.1466165)
+==> plan  parse-expression-statements-with-semicolon-significance
+      plan: 91.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-expression-statements-with-semicolon-significance-plan-20260427T064509511.txt
+==> exec  parse-expression-statements-with-semicolon-significance

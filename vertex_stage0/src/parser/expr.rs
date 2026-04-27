@@ -536,20 +536,14 @@ impl Parser {
             match self.peek() {
                 TokenKind::Semi => {
                     self.bump();
-                    stmts.push(Stmt::Expr {
-                        expr,
-                        has_semi: true,
-                    });
+                    stmts.push(crate::parser::stmt::expr_stmt_from(expr, true));
                 }
                 TokenKind::RBrace => {
                     tail = Some(Box::new(expr));
                     break;
                 }
                 _ => {
-                    stmts.push(Stmt::Expr {
-                        expr,
-                        has_semi: false,
-                    });
+                    stmts.push(crate::parser::stmt::expr_stmt_from(expr, false));
                 }
             }
         }
