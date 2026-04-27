@@ -252,7 +252,7 @@
   - [ ] Define `pub struct Arena { ... }` wrapping per-node-type arenas
   - [ ] **Verify:** `cargo build`; `grep -q '^typed-arena' Cargo.toml`
 
-- [ ] Define `Item` enum in `src/ast/item.rs`
+- [x] Define `Item` enum in `src/ast/item.rs`
   - [ ] Variants: `Fn(FnDef), Struct(StructDef), Enum(EnumDef), Impl(ImplDef), Trait(TraitDef), Mod(ModDef), Use(UseDef), Const(ConstDef), Static(StaticDef), TypeAlias(TypeAliasDef)`
   - [ ] Each variant references a struct stub (fields can be added later items)
   - [ ] Every node carries `id: NodeId, span: Span`

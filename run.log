@@ -204,3 +204,9 @@
 ==> plan  wire-arena-allocator-into-ast
       plan: 74.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\wire-arena-allocator-into-ast-plan-20260427T041151269.txt
 ==> exec  wire-arena-allocator-into-ast
+      exec: 40.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\wire-arena-allocator-into-ast-execute-20260427T041231319.txt
+      notes: - Placed the `[dependencies]` table at the bottom of `vertex_stage0/Cargo.toml` (after `[[test]]`) rather than reordering the existing tables — minimal-edit interpretation. / - Used a brief one-line-style comment (two short lines wrapped) at the top of `arena.rs` to satisfy the plan's "Document that per-node-type fields will be added" instruction while honoring the global "default to no comments" guidance.
+    [32/113] wire-arena-allocator-into-ast: plan $0.28 / execute $0.31 / verified / committed d310dd9
+==> plan  define-item-enum-in-src-ast-item-rs
+      plan: 95.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-item-enum-in-src-ast-item-rs-plan-20260427T041407344.txt
+==> exec  define-item-enum-in-src-ast-item-rs
