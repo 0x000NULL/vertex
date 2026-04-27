@@ -19,6 +19,12 @@ fn is_whitespace(b: u8) -> bool {
     matches!(b, b' ' | b'\t' | b'\n' | b'\r')
 }
 
+pub enum ScanStringOutcome {
+    Ok(String, Span),
+    Unterminated(Span),
+    Failed,
+}
+
 pub struct Scanner<'a> {
     pub src: &'a str,
     pub bytes: &'a [u8],
@@ -354,9 +360,9 @@ impl<'a> Scanner<'a> {
         Some((ch, Span::new(self.file_id, start as u32, self.pos as u32)))
     }
 
-    pub fn scan_string(&mut self) -> Option<(String, Span)> {
+    pub fn scan_string(&mut self) -> ScanStringOutcome {
         if self.peek() != Some(b'"') {
-            return None;
+            return ScanStringOutcome::Failed;
         }
         let start = self.pos;
         self.pos += 1;
@@ -365,19 +371,20 @@ impl<'a> Scanner<'a> {
         loop {
             match self.peek() {
                 None => {
-                    self.pos = start;
-                    return None;
+                    self.pos = self.bytes.len();
+                    let span = Span::new(self.file_id, start as u32, self.pos as u32);
+                    return ScanStringOutcome::Unterminated(span);
                 }
                 Some(b'"') => {
                     self.pos += 1;
                     let span = Span::new(self.file_id, start as u32, self.pos as u32);
-                    return Some((buf, span));
+                    return ScanStringOutcome::Ok(buf, span);
                 }
                 Some(b'\\') => match self.scan_escape_char() {
                     Some(c) => buf.push(c),
                     None => {
                         self.pos = start;
-                        return None;
+                        return ScanStringOutcome::Failed;
                     }
                 },
                 Some(_) => {
@@ -389,7 +396,7 @@ impl<'a> Scanner<'a> {
                         }
                         None => {
                             self.pos = start;
-                            return None;
+                            return ScanStringOutcome::Failed;
                         }
                     }
                 }
@@ -743,8 +750,16 @@ impl<'a> Scanner<'a> {
 
         if first == b'"' {
             match self.scan_string() {
-                Some((s, span)) => return Token::new(TokenKind::StringLiteral(s), span),
-                None => {
+                ScanStringOutcome::Ok(s, span) => {
+                    return Token::new(TokenKind::StringLiteral(s), span);
+                }
+                ScanStringOutcome::Unterminated(span) => {
+                    return Token::new(
+                        TokenKind::Error("unterminated string literal".to_string()),
+                        span,
+                    );
+                }
+                ScanStringOutcome::Failed => {
                     self.pos += 1;
                     let span = Span::new(self.file_id, start, self.pos as u32);
                     return Token::new(TokenKind::Error("\"".to_string()), span);
@@ -1082,7 +1097,11 @@ mod tests {
 
         for (input, expected) in happy {
             let mut s = Scanner::new(input, FileId(11));
-            let (value, span) = s.scan_string().expect(input);
+            let (value, span) = match s.scan_string() {
+                ScanStringOutcome::Ok(v, sp) => (v, sp),
+                ScanStringOutcome::Unterminated(_) => panic!("expected Ok, got Unterminated for {:?}", input),
+                ScanStringOutcome::Failed => panic!("expected Ok, got Failed for {:?}", input),
+            };
             assert_eq!(value, *expected, "value for {:?}", input);
             assert_eq!(span.file_id, FileId(11), "file_id for {:?}", input);
             assert_eq!(span.start, 0, "span.start for {:?}", input);
@@ -1090,8 +1109,26 @@ mod tests {
             assert_eq!(s.pos, input.len(), "pos for {:?}", input);
         }
 
-        let rejections: &[&str] = &[
-            "\"abc",
+        let unterminated: &[&str] = &["\"abc"];
+        for input in unterminated {
+            let mut s = Scanner::new(input, FileId(0));
+            match s.scan_string() {
+                ScanStringOutcome::Unterminated(span) => {
+                    assert_eq!(span.file_id, FileId(0), "file_id for {:?}", input);
+                    assert_eq!(span.start, 0, "span.start for {:?}", input);
+                    assert_eq!(span.end as usize, input.len(), "span.end for {:?}", input);
+                }
+                _ => panic!("expected Unterminated for {:?}", input),
+            }
+            assert_eq!(
+                s.pos,
+                input.len(),
+                "expected pos=len after unterminated {:?}",
+                input
+            );
+        }
+
+        let failed: &[&str] = &[
             "\"\\",
             "\"\\q\"",
             "\"\\xZZ\"",
@@ -1101,18 +1138,18 @@ mod tests {
             "\"\\u{110000}\"",
         ];
 
-        for input in rejections {
+        for input in failed {
             let mut s = Scanner::new(input, FileId(0));
             assert!(
-                s.scan_string().is_none(),
-                "expected None for {:?}",
+                matches!(s.scan_string(), ScanStringOutcome::Failed),
+                "expected Failed for {:?}",
                 input
             );
             assert_eq!(s.pos, 0, "expected pos=0 after rejecting {:?}", input);
         }
 
         let mut not_string = Scanner::new("abc", FileId(0));
-        assert!(not_string.scan_string().is_none());
+        assert!(matches!(not_string.scan_string(), ScanStringOutcome::Failed));
         assert_eq!(not_string.pos, 0);
     }
 
@@ -1674,5 +1711,99 @@ mod tests {
         assert!(matches!(last.kind, TokenKind::Eof));
         assert_eq!(last.span.start, last.span.end);
         assert_eq!(last.span.start as usize, src.len());
+    }
+
+    #[test]
+    fn unterminated_string_recovers() {
+        fn drive(src: &str, file_id: FileId) -> Vec<Token> {
+            let mut s = Scanner::new(src, file_id);
+            let mut tokens: Vec<Token> = Vec::new();
+            loop {
+                let t = s.next_token();
+                let is_eof = matches!(&t.kind, TokenKind::Eof);
+                tokens.push(t);
+                if is_eof {
+                    break;
+                }
+            }
+            tokens
+        }
+
+        // Case 1: bare unterminated string ending mid-content.
+        let src = "\"abc";
+        let file_id = FileId(51);
+        let tokens = drive(src, file_id);
+        assert_eq!(tokens.len(), 2, "tokens for {:?}: {:?}", src, tokens);
+        assert_eq!(
+            tokens[0].kind,
+            TokenKind::Error("unterminated string literal".to_string())
+        );
+        assert_eq!(tokens[0].span.file_id, file_id);
+        assert_eq!(tokens[0].span.start, 0);
+        assert_eq!(tokens[0].span.end as usize, src.len());
+        assert!(matches!(tokens[1].kind, TokenKind::Eof));
+        assert_eq!(tokens[1].span.file_id, file_id);
+        assert_eq!(tokens[1].span.start, tokens[1].span.end);
+        assert_eq!(tokens[1].span.start as usize, src.len());
+
+        // Case 2: unterminated string with embedded newline (newlines are allowed inside strings).
+        let src = "\"abc\n";
+        let file_id = FileId(52);
+        let tokens = drive(src, file_id);
+        assert_eq!(tokens.len(), 2, "tokens for {:?}: {:?}", src, tokens);
+        assert_eq!(
+            tokens[0].kind,
+            TokenKind::Error("unterminated string literal".to_string())
+        );
+        assert_eq!(tokens[0].span.file_id, file_id);
+        assert_eq!(tokens[0].span.start, 0);
+        assert_eq!(tokens[0].span.end as usize, src.len());
+        assert!(matches!(tokens[1].kind, TokenKind::Eof));
+        assert_eq!(tokens[1].span.file_id, file_id);
+        assert_eq!(tokens[1].span.start, tokens[1].span.end);
+        assert_eq!(tokens[1].span.start as usize, src.len());
+
+        // Case 3: error span starts at the open-quote, not byte 0.
+        let src = "prefix \"abc";
+        let file_id = FileId(53);
+        let tokens = drive(src, file_id);
+        let kinds: Vec<TokenKind> = tokens.iter().map(|t| t.kind.clone()).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                TokenKind::Ident("prefix".to_string()),
+                TokenKind::Error("unterminated string literal".to_string()),
+                TokenKind::Eof,
+            ]
+        );
+        let open_quote = src.find('"').expect("input contains a quote");
+        assert_eq!(tokens[1].span.file_id, file_id);
+        assert_eq!(tokens[1].span.start as usize, open_quote);
+        assert_eq!(tokens[1].span.end as usize, src.len());
+        assert!(matches!(tokens[2].kind, TokenKind::Eof));
+        assert_eq!(tokens[2].span.file_id, file_id);
+        assert_eq!(tokens[2].span.start, tokens[2].span.end);
+        assert_eq!(tokens[2].span.start as usize, src.len());
+
+        // Cross-cutting invariant: every error token's span ends at src.len() and final Eof has empty span at src.len().
+        for src in &["\"abc", "\"abc\n", "prefix \"abc"] {
+            let file_id = FileId(54);
+            let tokens = drive(src, file_id);
+            for t in &tokens {
+                assert_eq!(t.span.file_id, file_id);
+                if let TokenKind::Error(_) = &t.kind {
+                    assert_eq!(
+                        t.span.end as usize,
+                        src.len(),
+                        "error span end for {:?}",
+                        src
+                    );
+                }
+            }
+            let last = tokens.last().expect("at least Eof");
+            assert!(matches!(last.kind, TokenKind::Eof));
+            assert_eq!(last.span.start, last.span.end);
+            assert_eq!(last.span.start as usize, src.len());
+        }
     }
 }

@@ -158,3 +158,13 @@
 ==> exec  verify-every-token-carries-a-span
       exec: 69.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\verify-every-token-carries-a-span-execute-20260427T034956101.txt
       notes: - Authored a fresh source string rather than reusing the `tokenizes_full_program` constant verbatim, as the plan permits ("supplement so each scanning branch is exercised") — this lets the new test cover branches the existing one omits (raw string with hashes `r#"..."#`, every `*=` compound assign, inner doc comment `//!`, nested block comment, and the unknown-byte error path via `$`). / - Did not assert specific kinds or count — the existing `tokenizes_full_program` test already pins kinds; this test's job per the plan is purely the span invariant. Including only the invariants requested keeps it from duplicating coverage.
+    [24/113] verify-every-token-carries-a-span: plan $0.50 / execute $0.44 / verified / committed 1f9c606
+==> plan  invalid-character-recovery
+      plan: 52.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\invalid-character-recovery-plan-20260427T035048842.txt
+==> exec  invalid-character-recovery
+      exec: 59.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\invalid-character-recovery-execute-20260427T035147874.txt
+      notes: - Used `€` (`U+20AC`, 3 bytes) as the multibyte invalid character to demonstrate codepoint-width advance > 1, as the plan offered `€` or an emoji as alternatives. / - Wrote the `€` literal in the expected `TokenKind::Error` string as `"\u{20ac}"` (and used `'\u{20ac}'.len_utf8()` for the width assertion) to keep the test source ASCII-only and avoid any source-encoding ambiguity; this is the same character `'€'`.
+    [25/113] invalid-character-recovery: plan $0.45 / execute $0.44 / verified / committed d51cf70
+==> plan  unterminated-string-recovery
+      plan: 118.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\unterminated-string-recovery-plan-20260427T035346722.txt
+==> exec  unterminated-string-recovery

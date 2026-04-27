@@ -214,7 +214,7 @@
   - [ ] Emit `TokenKind::Error("invalid character: <ch>".to_string())`; advance one codepoint; continue
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::invalid_char_recovers`
 
-- [ ] Unterminated string recovery
+- [x] Unterminated string recovery
   - [ ] Emit error spanning open-quote → EOF; continue at EOF
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::unterminated_string_recovers`
 
