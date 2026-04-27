@@ -306,7 +306,7 @@
   - [ ] `eat(kind) -> bool` (advance if match), `expect(kind) -> Result<Token, CompileError>`
   - [ ] **Verify:** `cargo test --lib parser::tests::peek_and_bump_basics`
 
-- [ ] Add error-recovery sync points
+- [x] Add error-recovery sync points
   - [ ] Method `Parser::recover_to_sync` that advances until next `;`, `}`, or item-start keyword
   - [ ] Used by `Parser::expected_token_error` flow
   - [ ] **Verify:** `cargo test --lib parser::tests::recovery_advances_past_garbage`

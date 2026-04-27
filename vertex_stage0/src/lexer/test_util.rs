@@ -27,9 +27,6 @@ mod tests {
 
     #[test]
     fn macro_works() {
-        lex_eq!(
-            "let x",
-            vec![TokenKind::Let, TokenKind::Ident("x".into())]
-        );
+        lex_eq!("let x", vec![TokenKind::Let, TokenKind::Ident("x".into())]);
     }
 }

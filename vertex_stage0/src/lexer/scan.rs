@@ -250,8 +250,8 @@ impl<'a> Scanner<'a> {
             }
         }
 
-        let dot_followed_by_digit = self.peek_at(0) == Some(b'.')
-            && self.peek_at(1).map_or(false, |b| b.is_ascii_digit());
+        let dot_followed_by_digit =
+            self.peek_at(0) == Some(b'.') && self.peek_at(1).map_or(false, |b| b.is_ascii_digit());
         if !dot_followed_by_digit {
             self.pos = start;
             return None;
@@ -846,7 +846,10 @@ impl<'a> Scanner<'a> {
         }
 
         let rest = &self.src[self.pos..];
-        let ch = rest.chars().next().expect("peek was Some, so a char must exist");
+        let ch = rest
+            .chars()
+            .next()
+            .expect("peek was Some, so a char must exist");
         self.pos += ch.len_utf8();
         let span = Span::new(self.file_id, start, self.pos as u32);
         Token::new(TokenKind::Error(format!("invalid character: {}", ch)), span)
@@ -941,12 +944,7 @@ mod tests {
             assert_eq!(suffix, *expected_suffix, "suffix for {:?}", input);
             assert_eq!(span.file_id, FileId(7), "file_id for {:?}", input);
             assert_eq!(span.start, 0, "span.start for {:?}", input);
-            assert_eq!(
-                span.end as usize,
-                input.len(),
-                "span.end for {:?}",
-                input
-            );
+            assert_eq!(span.end as usize, input.len(), "span.end for {:?}", input);
             assert_eq!(s.pos, input.len(), "pos for {:?}", input);
         }
     }
@@ -1083,11 +1081,7 @@ mod tests {
 
         for input in rejections {
             let mut s = Scanner::new(input, FileId(0));
-            assert!(
-                s.scan_char().is_none(),
-                "expected None for {:?}",
-                input
-            );
+            assert!(s.scan_char().is_none(), "expected None for {:?}", input);
             assert_eq!(s.pos, 0, "expected pos=0 after rejecting {:?}", input);
         }
     }
@@ -1115,7 +1109,9 @@ mod tests {
             let mut s = Scanner::new(input, FileId(11));
             let (value, span) = match s.scan_string() {
                 ScanStringOutcome::Ok(v, sp) => (v, sp),
-                ScanStringOutcome::Unterminated(_) => panic!("expected Ok, got Unterminated for {:?}", input),
+                ScanStringOutcome::Unterminated(_) => {
+                    panic!("expected Ok, got Unterminated for {:?}", input)
+                }
                 ScanStringOutcome::Failed => panic!("expected Ok, got Failed for {:?}", input),
             };
             assert_eq!(value, *expected, "value for {:?}", input);
@@ -1165,7 +1161,10 @@ mod tests {
         }
 
         let mut not_string = Scanner::new("abc", FileId(0));
-        assert!(matches!(not_string.scan_string(), ScanStringOutcome::Failed));
+        assert!(matches!(
+            not_string.scan_string(),
+            ScanStringOutcome::Failed
+        ));
         assert_eq!(not_string.pos, 0);
     }
 
@@ -1192,14 +1191,7 @@ mod tests {
             assert_eq!(s.pos, input.len(), "pos for {:?}", input);
         }
 
-        let rejections: &[&str] = &[
-            "r",
-            "r#",
-            "r\"abc",
-            "r#\"abc\"",
-            "r##\"abc\"#",
-            "abc",
-        ];
+        let rejections: &[&str] = &["r", "r#", "r\"abc", "r#\"abc\"", "r##\"abc\"#", "abc"];
 
         for input in rejections {
             let mut s = Scanner::new(input, FileId(0));
@@ -1272,11 +1264,7 @@ mod tests {
             assert_eq!(style, DocStyle::Outer, "style for {:?}", input);
             assert_eq!(span.file_id, FileId(21), "file_id for {:?}", input);
             assert_eq!(span.start, 0, "span.start for {:?}", input);
-            assert_eq!(
-                span.end as usize, *expected_pos,
-                "span.end for {:?}",
-                input
-            );
+            assert_eq!(span.end as usize, *expected_pos, "span.end for {:?}", input);
             assert_eq!(s.pos, *expected_pos, "pos for {:?}", input);
         }
 
@@ -1292,22 +1280,11 @@ mod tests {
             assert_eq!(style, DocStyle::Inner, "style for {:?}", input);
             assert_eq!(span.file_id, FileId(22), "file_id for {:?}", input);
             assert_eq!(span.start, 0, "span.start for {:?}", input);
-            assert_eq!(
-                span.end as usize, *expected_pos,
-                "span.end for {:?}",
-                input
-            );
+            assert_eq!(span.end as usize, *expected_pos, "span.end for {:?}", input);
             assert_eq!(s.pos, *expected_pos, "pos for {:?}", input);
         }
 
-        let rejections: &[&str] = &[
-            "// regular\n",
-            "//\n",
-            "/* block */",
-            "abc",
-            "/",
-            "",
-        ];
+        let rejections: &[&str] = &["// regular\n", "//\n", "/* block */", "abc", "/", ""];
         for input in rejections {
             let mut s = Scanner::new(input, FileId(0));
             assert!(
@@ -1372,23 +1349,14 @@ mod tests {
             assert_eq!(&kind, expected_kind, "kind for {:?}", input);
             assert_eq!(span.file_id, FileId(31), "file_id for {:?}", input);
             assert_eq!(span.start, 0, "span.start for {:?}", input);
-            assert_eq!(
-                span.end as usize,
-                *expected_len,
-                "span.end for {:?}",
-                input
-            );
+            assert_eq!(span.end as usize, *expected_len, "span.end for {:?}", input);
             assert_eq!(s.pos, *expected_len, "pos for {:?}", input);
         }
 
         let rejections: &[&str] = &["a", "_", "#", "@", "$", "", "!"];
         for input in rejections {
             let mut s = Scanner::new(input, FileId(31));
-            assert!(
-                s.scan_operator().is_none(),
-                "expected None for {:?}",
-                input
-            );
+            assert!(s.scan_operator().is_none(), "expected None for {:?}", input);
             assert_eq!(s.pos, 0, "expected pos=0 after rejecting {:?}", input);
         }
     }
@@ -1720,7 +1688,10 @@ mod tests {
         assert_eq!(at_span.end - at_span.start, 1);
 
         let euro_span = errors[2].span;
-        assert_eq!(euro_span.end - euro_span.start, '\u{20ac}'.len_utf8() as u32);
+        assert_eq!(
+            euro_span.end - euro_span.start,
+            '\u{20ac}'.len_utf8() as u32
+        );
         assert!(euro_span.end - euro_span.start > 1);
 
         let last = tokens.last().expect("tokens has Eof");
@@ -1946,13 +1917,19 @@ mod tests {
                 assert!(
                     scanner.pos > prev_pos,
                     "scanner failed to advance (seed={:#x}, iter={}, pos={}, input={:?})",
-                    seed, iter, scanner.pos, bytes
+                    seed,
+                    iter,
+                    scanner.pos,
+                    bytes
                 );
 
                 assert!(
                     steps <= cap,
                     "scanner exceeded iteration cap {} (seed={:#x}, iter={}, input={:?})",
-                    cap, seed, iter, bytes
+                    cap,
+                    seed,
+                    iter,
+                    bytes
                 );
             }
         }
@@ -2243,10 +2220,7 @@ mod tests {
 
         #[test]
         fn lit_int_decimal() {
-            lex_eq!(
-                "42",
-                vec![TokenKind::IntLiteral(42, IntSuffix::Unsuffixed)]
-            );
+            lex_eq!("42", vec![TokenKind::IntLiteral(42, IntSuffix::Unsuffixed)]);
         }
 
         #[test]
@@ -2296,10 +2270,7 @@ mod tests {
 
         #[test]
         fn lit_string() {
-            lex_eq!(
-                "\"hello\"",
-                vec![TokenKind::StringLiteral("hello".into())]
-            );
+            lex_eq!("\"hello\"", vec![TokenKind::StringLiteral("hello".into())]);
         }
 
         #[test]

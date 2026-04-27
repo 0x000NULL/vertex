@@ -61,17 +61,31 @@ impl Parser {
         } else {
             let found = self.peek();
             let span = self.current_span();
-            let message = format!(
-                "expected {}, found {}",
-                describe(kind),
-                describe(found)
-            );
+            let message = format!("expected {}, found {}", describe(kind), describe(found));
             Err(CompileError::new(
                 ErrorCode::E0100,
                 ErrorKind::Syntax,
                 span,
                 message,
             ))
+        }
+    }
+
+    pub fn expected_token_error(&mut self, expected: &TokenKind) {
+        let found = self.peek();
+        let span = self.current_span();
+        let message = format!("expected {}, found {}", describe(expected), describe(found));
+        let err = CompileError::new(ErrorCode::E0100, ErrorKind::Syntax, span, message);
+        self.errors.push(err);
+        self.recover_to_sync();
+    }
+
+    pub fn recover_to_sync(&mut self) {
+        while !is_sync_point(self.peek()) {
+            self.bump();
+        }
+        if matches!(self.peek(), TokenKind::Semi) {
+            self.bump();
         }
     }
 
@@ -84,6 +98,27 @@ impl Parser {
             Span::new(crate::span::FileId(0), 0, 0)
         }
     }
+}
+
+fn is_sync_point(kind: &TokenKind) -> bool {
+    matches!(
+        kind,
+        TokenKind::Semi
+            | TokenKind::RBrace
+            | TokenKind::Eof
+            | TokenKind::Fn
+            | TokenKind::Struct
+            | TokenKind::Enum
+            | TokenKind::Trait
+            | TokenKind::Impl
+            | TokenKind::Mod
+            | TokenKind::Use
+            | TokenKind::Const
+            | TokenKind::Type
+            | TokenKind::Pub
+            | TokenKind::Unsafe
+            | TokenKind::Extern
+    )
 }
 
 fn describe(kind: &TokenKind) -> &'static str {
@@ -200,5 +235,37 @@ mod tests {
         assert!(!p.eat(&TokenKind::Star));
         assert_eq!(p.peek(), &TokenKind::Eof);
         assert!(p.expect(&TokenKind::Eof).is_ok());
+    }
+
+    #[test]
+    fn recovery_advances_past_garbage() {
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Plus),
+            tok(TokenKind::Star),
+            tok(TokenKind::Star),
+            tok(TokenKind::Semi),
+            tok(TokenKind::Fn),
+            tok(TokenKind::Eof),
+        ]);
+        p.recover_to_sync();
+        assert_eq!(p.peek(), &TokenKind::Fn);
+
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Plus),
+            tok(TokenKind::Star),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        p.recover_to_sync();
+        assert_eq!(p.peek(), &TokenKind::RBrace);
+
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Plus),
+            tok(TokenKind::Star),
+            tok(TokenKind::Fn),
+            tok(TokenKind::Eof),
+        ]);
+        p.recover_to_sync();
+        assert_eq!(p.peek(), &TokenKind::Fn);
     }
 }

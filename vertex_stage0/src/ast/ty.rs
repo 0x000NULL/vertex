@@ -1,4 +1,4 @@
-use crate::ast::{NodeId, expr::Path};
+use crate::ast::{expr::Path, NodeId};
 use crate::span::Span;
 
 #[allow(dead_code)]
