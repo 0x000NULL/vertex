@@ -379,7 +379,7 @@
   - [ ] `match scrut { pat if guard => expr, ... }`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::match_basic`
 
-- [ ] Parse return / break / continue
+- [x] Parse return / break / continue
   - [ ] `return value?`, `break 'label value?`, `continue 'label?`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::return_break_continue`
 

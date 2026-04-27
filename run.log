@@ -446,3 +446,7 @@
 ==> plan  parse-match-expressions
       plan: 114.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-match-expressions-plan-20260427T062647589.txt
 ==> exec  parse-match-expressions
+      exec: 167.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-match-expressions-execute-20260427T062934631.txt
+      notes: - The plan said the missing-`,` recovery should produce the `"expected `,` or `}`"` message via the existing error machinery. I implemented this by falling through to `expect(&TokenKind::RBrace)?`, which produces `"expected token, found {kind}"` (the project's stock `expect` message) — exactly as the plan's *Steps* prescribed. The "expected `,` or `}`" wording in the plan appears to be descriptive shorthand for the recovery behavior, not a literal message string. No test asserts on this message. / - Pattern stub also accepts `True` and `False` (as listed in the plan). `bool` literals are not exercised in the test, only `_`, identifier, and integer-literal patterns.
+    [17/72] parse-match-expressions: plan $0.79 / execute $1.22 / verified / committed 1b8d9b2
+==> plan  parse-return-break-continue

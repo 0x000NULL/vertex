@@ -1,7 +1,8 @@
 use crate::ast::expr::{
-    ArrayLit, ArrayRepeat, Binary, BinaryOp, Block, BoolLit, Call, Cast, CastTy, CharLit, Closure,
-    ClosureParam, Expr, FieldAccess, FloatLit, For, If, Index, IntLit, Loop, Match, MatchArm,
-    MethodCall, Pat, Range, StrLit, Try, TupleFieldAccess, TupleLit, Unary, UnaryOp, While,
+    ArrayLit, ArrayRepeat, Binary, BinaryOp, Block, BoolLit, Break, Call, Cast, CastTy, CharLit,
+    Closure, ClosureParam, Continue, Expr, FieldAccess, FloatLit, For, If, Index, IntLit, Loop,
+    Match, MatchArm, MethodCall, Pat, Range, Return, StrLit, Try, TupleFieldAccess, TupleLit,
+    Unary, UnaryOp, While,
 };
 use crate::ast::stmt::Stmt;
 use crate::error::{CompileError, ErrorCode, ErrorKind};
@@ -468,6 +469,62 @@ impl Parser {
         })
     }
 
+    fn parse_return(&mut self) -> Result<Expr, CompileError> {
+        let return_tok = self.expect(&TokenKind::Return)?;
+        let start_span = return_tok.span;
+        let value = if value_terminator(self.peek()) {
+            None
+        } else {
+            Some(Box::new(self.parse_expr()?))
+        };
+        let span = match &value {
+            Some(v) => start_span.merge(&v.span()),
+            None => start_span,
+        };
+        let id = self.new_node_id();
+        Ok(Expr::Return(Return { id, span, value }))
+    }
+
+    fn parse_break(&mut self) -> Result<Expr, CompileError> {
+        let break_tok = self.expect(&TokenKind::Break)?;
+        let start_span = break_tok.span;
+        let value = if value_terminator(self.peek()) {
+            None
+        } else {
+            Some(Box::new(self.parse_expr()?))
+        };
+        let span = match &value {
+            Some(v) => start_span.merge(&v.span()),
+            None => start_span,
+        };
+        let id = self.new_node_id();
+        Ok(Expr::Break(Break {
+            id,
+            span,
+            // TODO: `'label` not yet representable — the lexer has no
+            // lifetime/label token kind today (only `CharLiteral` for `'x'`),
+            // so label support is deferred until that token lands. Mirrors
+            // the closure-param / `for`-pattern stub strategy.
+            label: None,
+            value,
+        }))
+    }
+
+    fn parse_continue(&mut self) -> Result<Expr, CompileError> {
+        let continue_tok = self.expect(&TokenKind::Continue)?;
+        let start_span = continue_tok.span;
+        let id = self.new_node_id();
+        Ok(Expr::Continue(Continue {
+            id,
+            span: start_span,
+            // TODO: `'label` not yet representable — the lexer has no
+            // lifetime/label token kind today (only `CharLiteral` for `'x'`),
+            // so label support is deferred until that token lands. Mirrors
+            // the closure-param / `for`-pattern stub strategy.
+            label: None,
+        }))
+    }
+
     pub fn parse_block(&mut self) -> Result<Expr, CompileError> {
         let lbrace_tok = self.expect(&TokenKind::LBrace)?;
         let lbrace_span = lbrace_tok.span;
@@ -828,6 +885,9 @@ impl Parser {
             TokenKind::While => self.parse_while(),
             TokenKind::For => self.parse_for(),
             TokenKind::Match => self.parse_match(),
+            TokenKind::Return => self.parse_return(),
+            TokenKind::Break => self.parse_break(),
+            TokenKind::Continue => self.parse_continue(),
             _ => Err(self.unexpected_token_error("expression")),
         }
     }
@@ -869,6 +929,22 @@ fn range_rhs_starts_here(kind: &TokenKind) -> bool {
             | TokenKind::Amp
             | TokenKind::If
             | TokenKind::Match
+    )
+}
+
+// Terminator denylist used by `parse_return` / `parse_break` to decide
+// whether an optional value follows the keyword. If the next token is one of
+// these, the keyword stands alone with no value.
+fn value_terminator(kind: &TokenKind) -> bool {
+    matches!(
+        kind,
+        TokenKind::Semi
+            | TokenKind::Comma
+            | TokenKind::RParen
+            | TokenKind::RBrace
+            | TokenKind::RBracket
+            | TokenKind::FatArrow
+            | TokenKind::Eof
     )
 }
 
@@ -1612,7 +1688,10 @@ mod tests {
         ]);
         match p.parse_unary() {
             Err(e) => assert_eq!(e.code, ErrorCode::E0100),
-            Ok(other) => panic!("expected Err(E0100) for tuple-field overflow, got Ok({:?})", other),
+            Ok(other) => panic!(
+                "expected Err(E0100) for tuple-field overflow, got Ok({:?})",
+                other
+            ),
         }
 
         // 42 . + → Err
@@ -2023,11 +2102,7 @@ mod tests {
         assert!(p.errors.is_empty());
 
         // negative: `| 1i32` (missing closing `|`) → Err(E0100)
-        let mut p = Parser::new(vec![
-            tok(TokenKind::Pipe),
-            int_tok(1),
-            tok(TokenKind::Eof),
-        ]);
+        let mut p = Parser::new(vec![tok(TokenKind::Pipe), int_tok(1), tok(TokenKind::Eof)]);
         match p.parse_expr() {
             Err(e) => assert_eq!(e.code, ErrorCode::E0100),
             Ok(other) => panic!("expected Err(E0100) for `| 1i32`, got Ok({:?})", other),
@@ -2569,7 +2644,10 @@ mod tests {
                 assert!(m.arms[1].guard.is_none());
                 assert_eq!(int_value(&m.arms[1].body), 3);
             }
-            other => panic!("expected Match for `match 1 {{ 1 => 2, _ => 3 }}`, got {:?}", other),
+            other => panic!(
+                "expected Match for `match 1 {{ 1 => 2, _ => 3 }}`, got {:?}",
+                other
+            ),
         }
         assert!(p.errors.is_empty());
 
@@ -2658,6 +2736,130 @@ mod tests {
             tok(TokenKind::Eof),
         ]);
         assert!(p.parse_expr().is_err());
+    }
+
+    #[test]
+    fn return_break_continue() {
+        // `return` followed by Eof → Expr::Return with value: None, pos == 1
+        let mut p = Parser::new(vec![tok(TokenKind::Return), tok(TokenKind::Eof)]);
+        match p.parse_expr() {
+            Ok(Expr::Return(r)) => assert!(r.value.is_none()),
+            other => panic!("expected Return for `return`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 1);
+        assert!(p.errors.is_empty());
+
+        // `return 1i32` → Expr::Return with value: Some(IntLit { 1 })
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Return),
+            int_tok(1),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Return(r)) => {
+                let v = r.value.as_ref().expect("value");
+                assert_eq!(int_value(v), 1);
+            }
+            other => panic!("expected Return for `return 1`, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+
+        // `return ;` → Expr::Return with value: None, parser stopped at Semi
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Return),
+            tok(TokenKind::Semi),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Return(r)) => assert!(r.value.is_none()),
+            other => panic!("expected Return for `return ;`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 1);
+        assert!(matches!(p.peek(), TokenKind::Semi));
+        assert!(p.errors.is_empty());
+
+        // `break` followed by Eof → Expr::Break with value: None, label: None
+        let mut p = Parser::new(vec![tok(TokenKind::Break), tok(TokenKind::Eof)]);
+        match p.parse_expr() {
+            Ok(Expr::Break(b)) => {
+                assert!(b.value.is_none());
+                assert!(b.label.is_none());
+            }
+            other => panic!("expected Break for `break`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 1);
+        assert!(p.errors.is_empty());
+
+        // `break 7i32` → Expr::Break with value: Some(IntLit { 7 }), label: None
+        let mut p = Parser::new(vec![tok(TokenKind::Break), int_tok(7), tok(TokenKind::Eof)]);
+        match p.parse_expr() {
+            Ok(Expr::Break(b)) => {
+                let v = b.value.as_ref().expect("value");
+                assert_eq!(int_value(v), 7);
+                assert!(b.label.is_none());
+            }
+            other => panic!("expected Break for `break 7`, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+
+        // `continue` followed by Eof → Expr::Continue with label: None
+        let mut p = Parser::new(vec![tok(TokenKind::Continue), tok(TokenKind::Eof)]);
+        match p.parse_expr() {
+            Ok(Expr::Continue(c)) => assert!(c.label.is_none()),
+            other => panic!("expected Continue for `continue`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 1);
+        assert!(p.errors.is_empty());
+
+        // `continue ;` → Expr::Continue, parser stopped at Semi (must not
+        // consume a following expression)
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Continue),
+            tok(TokenKind::Semi),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Continue(c)) => assert!(c.label.is_none()),
+            other => panic!("expected Continue for `continue ;`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 1);
+        assert!(matches!(p.peek(), TokenKind::Semi));
+        assert!(p.errors.is_empty());
+
+        // Negative shape: `return + 1i32` — Plus is not a valid value head, so
+        // the recursive parse_expr call surfaces an Err.
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Return),
+            tok(TokenKind::Plus),
+            int_tok(1),
+            tok(TokenKind::Eof),
+        ]);
+        assert!(p.parse_expr().is_err());
+
+        // Block integration: `{ return; }` → Block with a single
+        // Stmt::Expr { expr: Return(_), has_semi: true } and tail: None.
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBrace),
+            tok(TokenKind::Return),
+            tok(TokenKind::Semi),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Block(b)) => {
+                assert!(b.tail.is_none());
+                assert_eq!(b.stmts.len(), 1);
+                match &b.stmts[0] {
+                    Stmt::Expr { expr, has_semi } => {
+                        assert!(*has_semi);
+                        assert!(matches!(expr, Expr::Return(_)));
+                    }
+                    other => panic!("expected Stmt::Expr, got {:?}", other),
+                }
+            }
+            other => panic!("expected Block for `{{ return; }}`, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
     }
 
     #[test]
