@@ -1,1 +1,3 @@
-fn main() { vertex_stage0::run(); }
+fn main() {
+    vertex_stage0::run();
+}
