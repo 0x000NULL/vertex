@@ -361,7 +361,7 @@
   - [ ] `[a, b, c]` and `[value; count]`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::array_literal_and_repeat`
 
-- [ ] Parse block expressions
+- [x] Parse block expressions
   - [ ] `{ stmts; tail_expr_optional }`
   - [ ] Block as last-stmt-without-semi → block-typed; otherwise unit
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::block_trailing_expr`

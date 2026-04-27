@@ -3,6 +3,7 @@ use crate::ast::expr::{
     ClosureParam, Expr, FieldAccess, FloatLit, Index, IntLit, MethodCall, Range, StrLit, Try,
     TupleFieldAccess, TupleLit, Unary, UnaryOp,
 };
+use crate::ast::stmt::Stmt;
 use crate::error::{CompileError, ErrorCode, ErrorKind};
 use crate::lexer::token::TokenKind;
 use crate::parser::Parser;
@@ -267,7 +268,7 @@ impl Parser {
         }
 
         let body = if matches!(self.peek(), TokenKind::LBrace) {
-            self.parse_block_stub()?
+            self.parse_block()?
         } else {
             self.parse_expr()?
         };
@@ -303,18 +304,43 @@ impl Parser {
         Ok(ClosureParam::Placeholder)
     }
 
-    // TODO: replaced by parse-block-expressions
-    fn parse_block_stub(&mut self) -> Result<Expr, CompileError> {
+    pub fn parse_block(&mut self) -> Result<Expr, CompileError> {
         let lbrace_tok = self.expect(&TokenKind::LBrace)?;
-        let inner = self.parse_expr()?;
+        let lbrace_span = lbrace_tok.span;
+
+        let mut stmts: Vec<Stmt> = Vec::new();
+        let mut tail: Option<Box<Expr>> = None;
+        while !matches!(self.peek(), TokenKind::RBrace | TokenKind::Eof) {
+            let expr = self.parse_expr()?;
+            match self.peek() {
+                TokenKind::Semi => {
+                    self.bump();
+                    stmts.push(Stmt::Expr {
+                        expr,
+                        has_semi: true,
+                    });
+                }
+                TokenKind::RBrace => {
+                    tail = Some(Box::new(expr));
+                    break;
+                }
+                _ => {
+                    stmts.push(Stmt::Expr {
+                        expr,
+                        has_semi: false,
+                    });
+                }
+            }
+        }
+
         let rbrace_tok = self.expect(&TokenKind::RBrace)?;
-        let span = lbrace_tok.span.merge(&rbrace_tok.span);
+        let span = lbrace_span.merge(&rbrace_tok.span);
         let id = self.new_node_id();
         Ok(Expr::Block(Block {
             id,
             span,
-            stmts: Vec::new(),
-            tail: Some(Box::new(inner)),
+            stmts,
+            tail,
         }))
     }
 
@@ -632,6 +658,7 @@ impl Parser {
             TokenKind::StringLiteral(_) | TokenKind::RawStringLiteral(_) => self.parse_str_lit(),
             TokenKind::True | TokenKind::False => self.parse_bool_lit(),
             TokenKind::LBracket => self.parse_array_literal(),
+            TokenKind::LBrace => self.parse_block(),
             _ => Err(self.unexpected_token_error("expression")),
         }
     }
@@ -1943,6 +1970,139 @@ mod tests {
         // [1i32 (missing `]`) → Err
         let mut p = Parser::new(vec![
             tok(TokenKind::LBracket),
+            int_tok(1),
+            tok(TokenKind::Eof),
+        ]);
+        assert!(p.parse_expr().is_err());
+    }
+
+    #[test]
+    fn block_trailing_expr() {
+        use crate::ast::stmt::Stmt;
+
+        // {} → empty block, no tail
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBrace),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Block(b)) => {
+                assert!(b.stmts.is_empty());
+                assert!(b.tail.is_none());
+            }
+            other => panic!("expected Block for `{{}}`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 2);
+        assert!(p.errors.is_empty());
+
+        // { 1i32 } → tail = Some(IntLit), no stmts
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBrace),
+            int_tok(1),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Block(b)) => {
+                assert!(b.stmts.is_empty());
+                let tail = b.tail.expect("tail");
+                assert_eq!(int_value(&tail), 1);
+            }
+            other => panic!("expected Block for `{{ 1i32 }}`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 3);
+        assert!(p.errors.is_empty());
+
+        // { 1i32; } → one Stmt::Expr { has_semi: true }, no tail
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBrace),
+            int_tok(1),
+            tok(TokenKind::Semi),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Block(b)) => {
+                assert_eq!(b.stmts.len(), 1);
+                match &b.stmts[0] {
+                    Stmt::Expr { expr, has_semi } => {
+                        assert!(*has_semi);
+                        assert_eq!(int_value(expr), 1);
+                    }
+                    other => panic!("expected Stmt::Expr, got {:?}", other),
+                }
+                assert!(b.tail.is_none());
+            }
+            other => panic!("expected Block for `{{ 1i32; }}`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 4);
+        assert!(p.errors.is_empty());
+
+        // { 1i32; 2i32 } → one stmt with semi, tail = Some(2)
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBrace),
+            int_tok(1),
+            tok(TokenKind::Semi),
+            int_tok(2),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Block(b)) => {
+                assert_eq!(b.stmts.len(), 1);
+                match &b.stmts[0] {
+                    Stmt::Expr { expr, has_semi } => {
+                        assert!(*has_semi);
+                        assert_eq!(int_value(expr), 1);
+                    }
+                    other => panic!("expected Stmt::Expr, got {:?}", other),
+                }
+                let tail = b.tail.expect("tail");
+                assert_eq!(int_value(&tail), 2);
+            }
+            other => panic!("expected Block for `{{ 1i32; 2i32 }}`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 5);
+        assert!(p.errors.is_empty());
+
+        // { 1i32; 2i32; } → two stmts with semi, no tail
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBrace),
+            int_tok(1),
+            tok(TokenKind::Semi),
+            int_tok(2),
+            tok(TokenKind::Semi),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Block(b)) => {
+                assert_eq!(b.stmts.len(), 2);
+                match &b.stmts[0] {
+                    Stmt::Expr { expr, has_semi } => {
+                        assert!(*has_semi);
+                        assert_eq!(int_value(expr), 1);
+                    }
+                    other => panic!("expected Stmt::Expr, got {:?}", other),
+                }
+                match &b.stmts[1] {
+                    Stmt::Expr { expr, has_semi } => {
+                        assert!(*has_semi);
+                        assert_eq!(int_value(expr), 2);
+                    }
+                    other => panic!("expected Stmt::Expr, got {:?}", other),
+                }
+                assert!(b.tail.is_none());
+            }
+            other => panic!("expected Block for `{{ 1i32; 2i32; }}`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 6);
+        assert!(p.errors.is_empty());
+
+        // { 1i32 (missing `}`) → Err
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBrace),
             int_tok(1),
             tok(TokenKind::Eof),
         ]);

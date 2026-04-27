@@ -413,3 +413,18 @@
       notes: - **`current_span` inlined**: the plan's "capture the start span" was implemented with the inline `if self.pos < self.tokens.len() { ... }` pattern already used elsewhere in `parse_unary` and `unexpected_token_error`, rather than calling the private `Parser::current_span` from `parser/mod.rs`. This matches existing style in the file. / - **Negative-test token sequence**: the plan listed `| 1i32` as the negative case. With tokens `[Pipe, IntLit, Eof]`, the failure surfaces in `parse_closure_param` ("expected identifier") rather than at the closing `|` — both produce E0100, which is what the plan asserts on. Conservative interpretation: assert only the error code, not the message.
     [11/72] parse-closure-expressions: plan $0.77 / execute $1.20 / verified / committed 4d55fd5
 ==> plan  parse-struct-literal-expressions
+      plan: 147.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-struct-literal-expressions-plan-20260427T060915544.txt
+    [12/72] parse-struct-literal-expressions: 1 cross-item, 1 local blockers -> needs-review
+        [cross-item] Does the prereq `parse-path-expressions` plan return `Result<Path, CompileError>` (the `ast::expr::Path` struct) or `Result<Expr, CompileError>` wrapping `Expr::Path(Path)`?
+          default: Assume it returns `Result<Path, CompileError>`. If it returns `Result<Expr, CompileError>` instead, destructure `Expr::Path(p) => p` at the call site in `parse_primary_for_paren`; this is a one-line adaptation and does not change the rest of the plan.
+        [local] Should this commit also wire `restrict_struct_literal=true` into the (currently nonexistent) `if`/`while`/`for`/`match` head parsers, or only land the flag and let those items consume it?
+          default: Land the flag and the consumer site only; do NOT modify `if`/`while`/`for`/`match` parsers (they don't exist yet). Document in the test that the flag suppresses struct-literal interpretation, leaving full integration to the dedicated control-flow items.
+==> plan  parse-array-literal-expressions
+      plan: 74.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-array-literal-expressions-plan-20260427T061029622.txt
+==> exec  parse-array-literal-expressions
+      exec: 104.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-array-literal-expressions-execute-20260427T061213670.txt
+      notes: - For the negative case `[1i32` (missing `]`), the plan said "`parse_array_literal` returns `Err`". The test invokes `parse_expr` (the public entry) rather than the private `parse_array_literal` directly, since the parser module is reachable through `parse_expr`. The error still bubbles up unchanged, so the assertion `is_err()` covers the requirement. / - The expected-token string in the catch-all error reads `` `,`, `;`, or `]` `` (with hyphen-comma-spaces between the backticked tokens) rather than the plan's literal `` `,` , `;` , or `]` `` rendering, since the latter has visible spaces that would surface oddly in user-facing diagnostics; this is the conservative interpretation that the plan intended a comma-separated list.
+    [13/72] parse-array-literal-expressions: plan $0.53 / execute $1.00 / verified / committed 67fab3e
+==> plan  parse-block-expressions
+      plan: 146.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-block-expressions-plan-20260427T061441107.txt
+==> exec  parse-block-expressions
