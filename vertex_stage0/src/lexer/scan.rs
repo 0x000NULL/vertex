@@ -261,6 +261,103 @@ impl<'a> Scanner<'a> {
         Some((value, suffix, span))
     }
 
+    pub fn scan_char(&mut self) -> Option<(char, Span)> {
+        if self.peek() != Some(b'\'') {
+            return None;
+        }
+        let start = self.pos;
+        self.pos += 1;
+
+        let ch = match self.peek() {
+            None | Some(b'\'') | Some(b'\n') => {
+                self.pos = start;
+                return None;
+            }
+            Some(b'\\') => match self.scan_char_escape() {
+                Some(c) => c,
+                None => {
+                    self.pos = start;
+                    return None;
+                }
+            },
+            Some(_) => {
+                let rest = &self.src[self.pos..];
+                match rest.chars().next() {
+                    Some(c) => {
+                        self.pos += c.len_utf8();
+                        c
+                    }
+                    None => {
+                        self.pos = start;
+                        return None;
+                    }
+                }
+            }
+        };
+
+        if self.peek() != Some(b'\'') {
+            self.pos = start;
+            return None;
+        }
+        self.pos += 1;
+
+        Some((ch, Span::new(self.file_id, start as u32, self.pos as u32)))
+    }
+
+    fn scan_char_escape(&mut self) -> Option<char> {
+        self.pos += 1;
+        let kind = self.bump()?;
+        match kind {
+            b'n' => Some('\n'),
+            b't' => Some('\t'),
+            b'r' => Some('\r'),
+            b'\\' => Some('\\'),
+            b'\'' => Some('\''),
+            b'"' => Some('"'),
+            b'0' => Some('\0'),
+            b'x' => {
+                let h1 = self.bump()?;
+                let h2 = self.bump()?;
+                if !h1.is_ascii_hexdigit() || !h2.is_ascii_hexdigit() {
+                    return None;
+                }
+                let v = (hex_digit_value(h1) as u32) * 16 + hex_digit_value(h2) as u32;
+                if v > 0x7F {
+                    return None;
+                }
+                char::from_u32(v)
+            }
+            b'u' => {
+                if self.bump()? != b'{' {
+                    return None;
+                }
+                let mut v: u32 = 0;
+                let mut count = 0u32;
+                loop {
+                    let b = self.peek()?;
+                    if b == b'}' {
+                        break;
+                    }
+                    if !b.is_ascii_hexdigit() {
+                        return None;
+                    }
+                    if count >= 6 {
+                        return None;
+                    }
+                    v = v * 16 + hex_digit_value(b) as u32;
+                    count += 1;
+                    self.pos += 1;
+                }
+                if count == 0 {
+                    return None;
+                }
+                self.pos += 1;
+                char::from_u32(v)
+            }
+            _ => None,
+        }
+    }
+
     fn scan_float_suffix(&mut self) -> FloatSuffix {
         if self.peek() != Some(b'f') {
             return FloatSuffix::Unsuffixed;
@@ -461,6 +558,58 @@ mod tests {
         for input in &[".5", "1", "1.0e"] {
             let mut s = Scanner::new(input, FileId(0));
             assert!(s.scan_float().is_none(), "expected None for {:?}", input);
+            assert_eq!(s.pos, 0, "expected pos=0 after rejecting {:?}", input);
+        }
+    }
+
+    #[test]
+    fn char_literal_escapes() {
+        let happy: &[(&str, char)] = &[
+            ("'a'", 'a'),
+            ("' '", ' '),
+            ("'!'", '!'),
+            ("'é'", 'é'),
+            ("'\\n'", '\n'),
+            ("'\\t'", '\t'),
+            ("'\\r'", '\r'),
+            ("'\\\\'", '\\'),
+            ("'\\''", '\''),
+            ("'\\\"'", '"'),
+            ("'\\0'", '\0'),
+            ("'\\x7F'", '\x7F'),
+            ("'\\u{1F600}'", '\u{1F600}'),
+        ];
+
+        for (input, expected) in happy {
+            let mut s = Scanner::new(input, FileId(9));
+            let (ch, span) = s.scan_char().expect(input);
+            assert_eq!(ch, *expected, "char for {:?}", input);
+            assert_eq!(span.file_id, FileId(9), "file_id for {:?}", input);
+            assert_eq!(span.start, 0, "span.start for {:?}", input);
+            assert_eq!(span.end as usize, input.len(), "span.end for {:?}", input);
+            assert_eq!(s.pos, input.len(), "pos for {:?}", input);
+        }
+
+        let rejections: &[&str] = &[
+            "''",
+            "'ab'",
+            "'a",
+            "'",
+            "'\n",
+            "'\\q'",
+            "'\\xZZ'",
+            "'\\u{}'",
+            "'\\u{D800}'",
+            "'\\u{110000}'",
+        ];
+
+        for input in rejections {
+            let mut s = Scanner::new(input, FileId(0));
+            assert!(
+                s.scan_char().is_none(),
+                "expected None for {:?}",
+                input
+            );
             assert_eq!(s.pos, 0, "expected pos=0 after rejecting {:?}", input);
         }
     }

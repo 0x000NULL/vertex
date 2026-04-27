@@ -161,7 +161,7 @@
   - [ ] Method `Scanner::scan_float` handling `1.0`, `1.0e10`, `1.0E-3`, `.5` (rejected per spec — must have leading digit), `f32`/`f64` suffix
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::float_literal_forms`
 
-- [ ] Implement char literal scanning
+- [x] Implement char literal scanning
   - [ ] Method `Scanner::scan_char`
   - [ ] Escapes: `\n \t \r \\ \' \" \0 \xNN \u{NNNN}`
   - [ ] Reject multi-codepoint content; reject unterminated
