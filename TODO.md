@@ -336,7 +336,7 @@
   - [ ] Comparison non-associative (reject `a < b < c`)
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::operator_precedence`; `cargo test --lib parser::expr::tests::comparison_non_associative_rejected`
 
-- [ ] Parse function call + method call + field access
+- [x] Parse function call + method call + field access
   - [ ] `f(args)`, `x.method(args)`, `x.field`, `x.0`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::call_method_field`
 

@@ -1,5 +1,6 @@
 use crate::ast::expr::{
-    Binary, BinaryOp, BoolLit, CharLit, Expr, FloatLit, IntLit, StrLit, TupleLit, Unary, UnaryOp,
+    Binary, BinaryOp, BoolLit, Call, CharLit, Expr, FieldAccess, FloatLit, IntLit, MethodCall,
+    StrLit, TupleFieldAccess, TupleLit, Unary, UnaryOp,
 };
 use crate::error::{CompileError, ErrorCode, ErrorKind};
 use crate::lexer::token::TokenKind;
@@ -226,7 +227,7 @@ impl Parser {
                     UnaryOp::Ref
                 }
             }
-            _ => return self.parse_primary_for_paren(),
+            _ => return self.parse_postfix(),
         };
         let operand = self.parse_unary()?;
         let span = op_span.merge(&operand.span());
@@ -237,6 +238,112 @@ impl Parser {
             op,
             operand: Box::new(operand),
         }))
+    }
+
+    fn parse_postfix(&mut self) -> Result<Expr, CompileError> {
+        let mut expr = self.parse_primary_for_paren()?;
+        loop {
+            match self.peek() {
+                TokenKind::LParen => {
+                    self.bump();
+                    let mut args: Vec<Expr> = Vec::new();
+                    while !matches!(self.peek(), TokenKind::RParen | TokenKind::Eof) {
+                        let arg = self.parse_expr()?;
+                        args.push(arg);
+                        if matches!(self.peek(), TokenKind::Comma) {
+                            self.bump();
+                        } else {
+                            break;
+                        }
+                    }
+                    let rparen_tok = self.expect(&TokenKind::RParen)?;
+                    let span = expr.span().merge(&rparen_tok.span);
+                    let id = self.new_node_id();
+                    expr = Expr::Call(Call {
+                        id,
+                        span,
+                        callee: Box::new(expr),
+                        args,
+                    });
+                }
+                TokenKind::Dot => {
+                    self.bump();
+                    match self.peek() {
+                        TokenKind::Ident(_) => {
+                            let ident_span = self.tokens[self.pos].span;
+                            let ident_tok = self.bump();
+                            let name = match ident_tok.kind {
+                                TokenKind::Ident(s) => s,
+                                _ => unreachable!(),
+                            };
+                            if matches!(self.peek(), TokenKind::LParen) {
+                                self.bump();
+                                let mut args: Vec<Expr> = Vec::new();
+                                while !matches!(self.peek(), TokenKind::RParen | TokenKind::Eof) {
+                                    let arg = self.parse_expr()?;
+                                    args.push(arg);
+                                    if matches!(self.peek(), TokenKind::Comma) {
+                                        self.bump();
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                let rparen_tok = self.expect(&TokenKind::RParen)?;
+                                let span = expr.span().merge(&rparen_tok.span);
+                                let id = self.new_node_id();
+                                expr = Expr::MethodCall(MethodCall {
+                                    id,
+                                    span,
+                                    receiver: Box::new(expr),
+                                    method: name,
+                                    args,
+                                    generic_args: vec![],
+                                });
+                            } else {
+                                let span = expr.span().merge(&ident_span);
+                                let id = self.new_node_id();
+                                expr = Expr::Field(FieldAccess {
+                                    id,
+                                    span,
+                                    receiver: Box::new(expr),
+                                    name,
+                                });
+                            }
+                        }
+                        TokenKind::IntLiteral(_, _) => {
+                            let intlit_span = self.tokens[self.pos].span;
+                            let intlit_tok = self.bump();
+                            let v = match intlit_tok.kind {
+                                TokenKind::IntLiteral(v, _) => v,
+                                _ => unreachable!(),
+                            };
+                            if v > u32::MAX as u64 {
+                                return Err(CompileError::new(
+                                    ErrorCode::E0100,
+                                    ErrorKind::Syntax,
+                                    intlit_span,
+                                    "tuple field index exceeds u32::MAX",
+                                ));
+                            }
+                            let span = expr.span().merge(&intlit_span);
+                            let id = self.new_node_id();
+                            expr = Expr::TupleField(TupleFieldAccess {
+                                id,
+                                span,
+                                receiver: Box::new(expr),
+                                idx: v as u32,
+                            });
+                        }
+                        _ => {
+                            return Err(
+                                self.unexpected_token_error("identifier or integer literal")
+                            );
+                        }
+                    }
+                }
+                _ => return Ok(expr),
+            }
+        }
     }
 
     // Temporary stub: only handles literal heads. Will be replaced by
@@ -888,6 +995,182 @@ mod tests {
         assert_eq!(inner.op, BinaryOp::Add);
         assert_eq!(int_value(&inner.lhs), 2);
         assert_eq!(int_value(&inner.rhs), 3);
+    }
+
+    #[test]
+    fn call_method_field() {
+        // 42()
+        let mut p = Parser::new(vec![
+            int_tok(42),
+            tok(TokenKind::LParen),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Ok(Expr::Call(c)) => {
+                assert!(c.args.is_empty());
+                match *c.callee {
+                    Expr::IntLit(lit) => assert_eq!(lit.value, 42),
+                    other => panic!("expected IntLit callee, got {:?}", other),
+                }
+            }
+            other => panic!("expected Ok(Call) for `42()`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 3);
+        assert!(p.errors.is_empty());
+
+        // 42(1, 2,)
+        let mut p = Parser::new(vec![
+            int_tok(42),
+            tok(TokenKind::LParen),
+            int_tok(1),
+            tok(TokenKind::Comma),
+            int_tok(2),
+            tok(TokenKind::Comma),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Ok(Expr::Call(c)) => {
+                assert_eq!(c.args.len(), 2);
+                assert_eq!(int_value(&c.args[0]), 1);
+                assert_eq!(int_value(&c.args[1]), 2);
+            }
+            other => panic!("expected Ok(Call) for `42(1, 2,)`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 7);
+        assert!(p.errors.is_empty());
+
+        // 42 . foo
+        let mut p = Parser::new(vec![
+            int_tok(42),
+            tok(TokenKind::Dot),
+            tok(TokenKind::Ident("foo".to_string())),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Ok(Expr::Field(f)) => {
+                assert_eq!(f.name, "foo");
+                match *f.receiver {
+                    Expr::IntLit(lit) => assert_eq!(lit.value, 42),
+                    other => panic!("expected IntLit receiver, got {:?}", other),
+                }
+            }
+            other => panic!("expected Ok(Field) for `42.foo`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 3);
+        assert!(p.errors.is_empty());
+
+        // 42 . foo (7)
+        let mut p = Parser::new(vec![
+            int_tok(42),
+            tok(TokenKind::Dot),
+            tok(TokenKind::Ident("foo".to_string())),
+            tok(TokenKind::LParen),
+            int_tok(7),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Ok(Expr::MethodCall(m)) => {
+                assert_eq!(m.method, "foo");
+                assert!(m.generic_args.is_empty());
+                assert_eq!(m.args.len(), 1);
+                assert_eq!(int_value(&m.args[0]), 7);
+                match *m.receiver {
+                    Expr::IntLit(lit) => assert_eq!(lit.value, 42),
+                    other => panic!("expected IntLit receiver, got {:?}", other),
+                }
+            }
+            other => panic!("expected Ok(MethodCall) for `42.foo(7)`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 6);
+        assert!(p.errors.is_empty());
+
+        // 42 . 0  (tuple field)
+        let mut p = Parser::new(vec![
+            int_tok(42),
+            tok(TokenKind::Dot),
+            tok(TokenKind::IntLiteral(0, IntSuffix::Unsuffixed)),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Ok(Expr::TupleField(t)) => {
+                assert_eq!(t.idx, 0);
+                match *t.receiver {
+                    Expr::IntLit(lit) => assert_eq!(lit.value, 42),
+                    other => panic!("expected IntLit receiver, got {:?}", other),
+                }
+            }
+            other => panic!("expected Ok(TupleField) for `42.0`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 3);
+        assert!(p.errors.is_empty());
+
+        // 42 . <u64::MAX> → Err(E0100)
+        let mut p = Parser::new(vec![
+            int_tok(42),
+            tok(TokenKind::Dot),
+            tok(TokenKind::IntLiteral(u64::MAX, IntSuffix::Unsuffixed)),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Err(e) => assert_eq!(e.code, ErrorCode::E0100),
+            Ok(other) => panic!("expected Err(E0100) for tuple-field overflow, got Ok({:?})", other),
+        }
+
+        // 42 . + → Err
+        let mut p = Parser::new(vec![
+            int_tok(42),
+            tok(TokenKind::Dot),
+            tok(TokenKind::Plus),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Err(e) => assert_eq!(e.code, ErrorCode::E0100),
+            Ok(other) => panic!("expected Err(E0100) for `42.+`, got Ok({:?})", other),
+        }
+
+        // 42 . foo () . bar . 0  → TupleField(Field(MethodCall(IntLit, "foo", []), "bar"), 0)
+        let mut p = Parser::new(vec![
+            int_tok(42),
+            tok(TokenKind::Dot),
+            tok(TokenKind::Ident("foo".to_string())),
+            tok(TokenKind::LParen),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Dot),
+            tok(TokenKind::Ident("bar".to_string())),
+            tok(TokenKind::Dot),
+            tok(TokenKind::IntLiteral(0, IntSuffix::Unsuffixed)),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Ok(Expr::TupleField(t)) => {
+                assert_eq!(t.idx, 0);
+                match *t.receiver {
+                    Expr::Field(f) => {
+                        assert_eq!(f.name, "bar");
+                        match *f.receiver {
+                            Expr::MethodCall(m) => {
+                                assert_eq!(m.method, "foo");
+                                assert!(m.args.is_empty());
+                                match *m.receiver {
+                                    Expr::IntLit(lit) => assert_eq!(lit.value, 42),
+                                    other => {
+                                        panic!("expected IntLit at chain root, got {:?}", other)
+                                    }
+                                }
+                            }
+                            other => panic!("expected MethodCall in chain, got {:?}", other),
+                        }
+                    }
+                    other => panic!("expected Field in chain, got {:?}", other),
+                }
+            }
+            other => panic!("expected Ok(TupleField) for chain, got {:?}", other),
+        }
+        assert_eq!(p.pos, 9);
+        assert!(p.errors.is_empty());
     }
 
     #[test]
