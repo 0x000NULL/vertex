@@ -631,3 +631,11 @@
 ==> exec  parse-slice-array-types
       exec: 90.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-slice-array-types-execute-20260427T085137377.txt
       notes: - Imported `IntSuffix` and `Expr` from the existing crate paths in the test module rather than fully-qualifying them at use sites (matches the surrounding test style). / - Did not assert the exact `IntSuffix` value of the `[i32; 4]` length literal — only `lit.value == 4`. This stays narrow per "the test pins this with a plain integer literal to avoid any surprise" and avoids coupling to lexer suffix conventions.
+    [47/72] parse-slice-array-types: plan $0.62 / execute $0.77 / verified / committed 5e20da3
+==> plan  parse-tuple-types
+      plan: 60.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-tuple-types-plan-20260427T085238396.txt
+==> exec  parse-tuple-types
+      exec: 79.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-tuple-types-execute-20260427T085357428.txt
+      notes: - The plan suggested either eating a `Comma` then looping or using a manual structure. I used `self.expect(&TokenKind::Comma)?` once after the first element to consume the comma that distinguishes a tuple from grouping, then a loop that supports trailing commas and additional elements. This is the most conservative interpretation and supports `(T,)` (1-tuple) automatically: after `expect(Comma)`, the loop sees `RParen` and breaks, yielding `Type::Tuple(vec![T])`. / - Did not remove the test module's local `use crate::span::FileId;` since `use super::*;` already brings it in scope; explicit `use` shadows glob imports without a conflict warning in Rust, and removing it was outside the plan's scope.
+    [48/72] parse-tuple-types: plan $0.35 / execute $0.53 / verified / committed db55292
+==> plan  parse-function-types

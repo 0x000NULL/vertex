@@ -19,6 +19,17 @@ impl Parser {
         if matches!(self.peek(), TokenKind::LParen) {
             return self.parse_tuple_or_grouped_type();
         }
+        if matches!(self.peek(), TokenKind::Fn) {
+            return self.parse_fn_type();
+        }
+        if matches!(self.peek(), TokenKind::Extern)
+            && matches!(
+                self.peek_at(1),
+                TokenKind::Fn | TokenKind::StringLiteral(_)
+            )
+        {
+            return self.parse_fn_type();
+        }
         // Stopgap path-type body: replaced by `parse-path-types-with-generic-args`.
         let ident_tok = self.expect(&TokenKind::Ident(String::new()))?;
         let span = ident_tok.span;
@@ -122,6 +133,44 @@ impl Parser {
         Ok(Type::Tuple(elems))
     }
 
+    fn parse_fn_type(&mut self) -> Result<Type, CompileError> {
+        if matches!(self.peek(), TokenKind::Extern) {
+            self.bump();
+            if matches!(self.peek(), TokenKind::StringLiteral(_)) {
+                let abi_tok = self.bump();
+                let _abi = match abi_tok.kind {
+                    TokenKind::StringLiteral(s) => s,
+                    _ => unreachable!(),
+                };
+            }
+        }
+        self.expect(&TokenKind::Fn)?;
+        self.expect(&TokenKind::LParen)?;
+        let mut params = Vec::new();
+        loop {
+            if matches!(self.peek(), TokenKind::RParen) {
+                break;
+            }
+            params.push(self.parse_type()?);
+            if matches!(self.peek(), TokenKind::Comma) {
+                self.bump();
+                continue;
+            }
+            break;
+        }
+        self.expect(&TokenKind::RParen)?;
+        let ret = if matches!(self.peek(), TokenKind::Arrow) {
+            self.bump();
+            self.parse_type()?
+        } else {
+            Type::Tuple(Vec::new())
+        };
+        Ok(Type::Fn {
+            params,
+            ret: Box::new(ret),
+        })
+    }
+
     fn parse_ref_type(&mut self) -> Result<Type, CompileError> {
         debug_assert!(matches!(self.peek(), TokenKind::Amp));
         let amp_tok = self.bump();
@@ -163,6 +212,17 @@ fn type_span(ty: &Type) -> Span {
                 type_span(first)
             } else {
                 Span::new(FileId(0), 0, 0)
+            }
+        }
+        Type::Fn { params, ret } => {
+            if matches!(ret.as_ref(), Type::Tuple(elems) if elems.is_empty()) {
+                if let Some(first) = params.first() {
+                    type_span(first)
+                } else {
+                    Span::new(FileId(0), 0, 0)
+                }
+            } else {
+                type_span(ret)
             }
         }
         _ => unreachable!("type_span: unexpected variant from stopgap parse_type"),
@@ -435,6 +495,103 @@ mod tests {
         ]);
         let ty = p.parse_type().expect("parse_type (i32)");
         assert_path_ident(&ty, "i32");
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+    }
+
+    #[test]
+    fn fn_types() {
+        // fn() -> i32
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Fn),
+            tok(TokenKind::LParen),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Arrow),
+            ident_tok("i32"),
+            tok(TokenKind::Eof),
+        ]);
+        let ty = p.parse_type().expect("parse_type fn() -> i32");
+        match ty {
+            Type::Fn { params, ret } => {
+                assert!(params.is_empty(), "expected zero params");
+                assert_path_ident(&ret, "i32");
+            }
+            other => panic!("expected Type::Fn, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // fn(i32, u8) -> bool
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Fn),
+            tok(TokenKind::LParen),
+            ident_tok("i32"),
+            tok(TokenKind::Comma),
+            ident_tok("u8"),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Arrow),
+            ident_tok("bool"),
+            tok(TokenKind::Eof),
+        ]);
+        let ty = p.parse_type().expect("parse_type fn(i32, u8) -> bool");
+        match ty {
+            Type::Fn { params, ret } => {
+                assert_eq!(params.len(), 2);
+                assert_path_ident(&params[0], "i32");
+                assert_path_ident(&params[1], "u8");
+                assert_path_ident(&ret, "bool");
+            }
+            other => panic!("expected Type::Fn, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // fn(i32) -- no `-> T`, return is unit `()`
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Fn),
+            tok(TokenKind::LParen),
+            ident_tok("i32"),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Eof),
+        ]);
+        let ty = p.parse_type().expect("parse_type fn(i32)");
+        match ty {
+            Type::Fn { params, ret } => {
+                assert_eq!(params.len(), 1);
+                assert_path_ident(&params[0], "i32");
+                match *ret {
+                    Type::Tuple(elems) => assert!(elems.is_empty(), "expected unit return"),
+                    other => panic!("expected unit Type::Tuple, got {:?}", other),
+                }
+            }
+            other => panic!("expected Type::Fn, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // extern "C" fn(i32) -> i32
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Extern),
+            tok(TokenKind::StringLiteral("C".to_string())),
+            tok(TokenKind::Fn),
+            tok(TokenKind::LParen),
+            ident_tok("i32"),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Arrow),
+            ident_tok("i32"),
+            tok(TokenKind::Eof),
+        ]);
+        let ty = p
+            .parse_type()
+            .expect("parse_type extern \"C\" fn(i32) -> i32");
+        match ty {
+            Type::Fn { params, ret } => {
+                assert_eq!(params.len(), 1);
+                assert_path_ident(&params[0], "i32");
+                assert_path_ident(&ret, "i32");
+            }
+            other => panic!("expected Type::Fn, got {:?}", other),
+        }
         assert!(p.errors.is_empty());
         assert!(matches!(p.peek(), TokenKind::Eof));
     }

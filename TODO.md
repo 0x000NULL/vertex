@@ -538,7 +538,7 @@
   - [ ] `(T, U, V)`, `()` (unit)
   - [ ] **Verify:** `cargo test --lib parser::ty::tests::tuple_types`
 
-- [ ] Parse function types
+- [x] Parse function types
   - [ ] `fn(T, U) -> V`, `extern "C" fn(...)`
   - [ ] **Verify:** `cargo test --lib parser::ty::tests::fn_types`
 
