@@ -186,3 +186,7 @@
 ==> plan  snapshot-test-helper-macro-in-src-lexer-test-util-rs
       plan: 52.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\snapshot-test-helper-macro-in-src-lexer-test-util-rs-plan-20260427T040315630.txt
 ==> exec  snapshot-test-helper-macro-in-src-lexer-test-util-rs
+      exec: 57.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\snapshot-test-helper-macro-in-src-lexer-test-util-rs-execute-20260427T040412680.txt
+      notes: - Used `vec![TokenKind::Let, TokenKind::Ident("x".into())]` (a `Vec<TokenKind>`) as the expected value in the self-test. The macro asserts `kinds == $expected`; since `kinds` is `Vec<TokenKind>`, supplying a `Vec` is the most conservative choice that exercises `PartialEq` exactly as the plan describes (slices/arrays would not directly satisfy `PartialEq<Vec>` without coercion). / - Annotated the macro with a single `//` line comment describing intent (drops spans, excludes trailing `Eof`), per the plan's "documented in a one-line `//` comment on the macro" assumption.
+    [29/113] snapshot-test-helper-macro-in-src-lexer-test-util-rs: plan $0.36 / execute $0.45 / verified / committed 55852e5
+==> plan  add-30-snapshot-tests-for-spec-2-examples

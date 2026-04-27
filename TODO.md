@@ -235,7 +235,7 @@
   - [ ] Compare token kind list (drop spans for snapshot brevity)
   - [ ] **Verify:** `cargo test --lib lexer::test_util::tests::macro_works`
 
-- [ ] Add 30+ snapshot tests for spec §2 examples
+- [x] Add 30+ snapshot tests for spec §2 examples
   - [ ] One test per example in `vertex_v1_spec.md` §2
   - [ ] **Verify:** `cargo test --lib lexer:: 2>&1 | grep -c 'test result: ok' >= 1` (full suite passes)
 

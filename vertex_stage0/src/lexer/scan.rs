@@ -1957,4 +1957,465 @@ mod tests {
             }
         }
     }
+
+    mod spec_section_2 {
+        use super::*;
+        use crate::lex_eq;
+
+        // Keywords (one per `TokenKind` keyword variant present in the spec's
+        // §2 keyword list — `defer` is intentionally omitted, see plan).
+
+        #[test]
+        fn kw_break() {
+            lex_eq!("break", vec![TokenKind::Break]);
+        }
+
+        #[test]
+        fn kw_const() {
+            lex_eq!("const", vec![TokenKind::Const]);
+        }
+
+        #[test]
+        fn kw_continue() {
+            lex_eq!("continue", vec![TokenKind::Continue]);
+        }
+
+        #[test]
+        fn kw_else() {
+            lex_eq!("else", vec![TokenKind::Else]);
+        }
+
+        #[test]
+        fn kw_enum() {
+            lex_eq!("enum", vec![TokenKind::Enum]);
+        }
+
+        #[test]
+        fn kw_extern() {
+            lex_eq!("extern", vec![TokenKind::Extern]);
+        }
+
+        #[test]
+        fn kw_false() {
+            lex_eq!("false", vec![TokenKind::False]);
+        }
+
+        #[test]
+        fn kw_fn() {
+            lex_eq!("fn", vec![TokenKind::Fn]);
+        }
+
+        #[test]
+        fn kw_for() {
+            lex_eq!("for", vec![TokenKind::For]);
+        }
+
+        #[test]
+        fn kw_if() {
+            lex_eq!("if", vec![TokenKind::If]);
+        }
+
+        #[test]
+        fn kw_impl() {
+            lex_eq!("impl", vec![TokenKind::Impl]);
+        }
+
+        #[test]
+        fn kw_in() {
+            lex_eq!("in", vec![TokenKind::In]);
+        }
+
+        #[test]
+        fn kw_let() {
+            lex_eq!("let", vec![TokenKind::Let]);
+        }
+
+        #[test]
+        fn kw_loop() {
+            lex_eq!("loop", vec![TokenKind::Loop]);
+        }
+
+        #[test]
+        fn kw_match() {
+            lex_eq!("match", vec![TokenKind::Match]);
+        }
+
+        #[test]
+        fn kw_mod() {
+            lex_eq!("mod", vec![TokenKind::Mod]);
+        }
+
+        #[test]
+        fn kw_mut() {
+            lex_eq!("mut", vec![TokenKind::Mut]);
+        }
+
+        #[test]
+        fn kw_pub() {
+            lex_eq!("pub", vec![TokenKind::Pub]);
+        }
+
+        #[test]
+        fn kw_return() {
+            lex_eq!("return", vec![TokenKind::Return]);
+        }
+
+        #[test]
+        fn kw_self_lower() {
+            lex_eq!("self", vec![TokenKind::SelfLower]);
+        }
+
+        #[test]
+        fn kw_self_upper() {
+            lex_eq!("Self", vec![TokenKind::SelfUpper]);
+        }
+
+        #[test]
+        fn kw_struct() {
+            lex_eq!("struct", vec![TokenKind::Struct]);
+        }
+
+        #[test]
+        fn kw_trait() {
+            lex_eq!("trait", vec![TokenKind::Trait]);
+        }
+
+        #[test]
+        fn kw_true() {
+            lex_eq!("true", vec![TokenKind::True]);
+        }
+
+        #[test]
+        fn kw_type() {
+            lex_eq!("type", vec![TokenKind::Type]);
+        }
+
+        #[test]
+        fn kw_unsafe() {
+            lex_eq!("unsafe", vec![TokenKind::Unsafe]);
+        }
+
+        #[test]
+        fn kw_use() {
+            lex_eq!("use", vec![TokenKind::Use]);
+        }
+
+        #[test]
+        fn kw_where() {
+            lex_eq!("where", vec![TokenKind::Where]);
+        }
+
+        #[test]
+        fn kw_while() {
+            lex_eq!("while", vec![TokenKind::While]);
+        }
+
+        // Logical word operators (spec §2: "Logical (words only, no symbols)").
+
+        #[test]
+        fn op_word_and() {
+            lex_eq!("and", vec![TokenKind::And]);
+        }
+
+        #[test]
+        fn op_word_or() {
+            lex_eq!("or", vec![TokenKind::Or]);
+        }
+
+        #[test]
+        fn op_word_not() {
+            lex_eq!("not", vec![TokenKind::Not]);
+        }
+
+        // Operator packs — one test per spec §2 operator subsection.
+
+        #[test]
+        fn op_arith_pack() {
+            lex_eq!(
+                "+ - * / %",
+                vec![
+                    TokenKind::Plus,
+                    TokenKind::Minus,
+                    TokenKind::Star,
+                    TokenKind::Slash,
+                    TokenKind::Percent,
+                ]
+            );
+        }
+
+        #[test]
+        fn op_cmp_pack() {
+            lex_eq!(
+                "== != < > <= >=",
+                vec![
+                    TokenKind::EqEq,
+                    TokenKind::BangEq,
+                    TokenKind::Lt,
+                    TokenKind::Gt,
+                    TokenKind::Le,
+                    TokenKind::Ge,
+                ]
+            );
+        }
+
+        #[test]
+        fn op_bitwise_pack() {
+            lex_eq!(
+                "& | ^ ~ << >>",
+                vec![
+                    TokenKind::Amp,
+                    TokenKind::Pipe,
+                    TokenKind::Caret,
+                    TokenKind::Tilde,
+                    TokenKind::Shl,
+                    TokenKind::Shr,
+                ]
+            );
+        }
+
+        #[test]
+        fn op_assign_pack() {
+            lex_eq!(
+                "= += -= *= /= %=",
+                vec![
+                    TokenKind::Eq,
+                    TokenKind::PlusEq,
+                    TokenKind::MinusEq,
+                    TokenKind::StarEq,
+                    TokenKind::SlashEq,
+                    TokenKind::PercentEq,
+                ]
+            );
+        }
+
+        #[test]
+        fn op_access_pack() {
+            lex_eq!(
+                ". :: [] ()",
+                vec![
+                    TokenKind::Dot,
+                    TokenKind::ColonColon,
+                    TokenKind::LBracket,
+                    TokenKind::RBracket,
+                    TokenKind::LParen,
+                    TokenKind::RParen,
+                ]
+            );
+        }
+
+        #[test]
+        fn op_control_flow_pack() {
+            lex_eq!(
+                "? .. ..= ->",
+                vec![
+                    TokenKind::Question,
+                    TokenKind::DotDot,
+                    TokenKind::DotDotEq,
+                    TokenKind::Arrow,
+                ]
+            );
+        }
+
+        #[test]
+        fn op_special_pack() {
+            lex_eq!(
+                "; , : _",
+                vec![
+                    TokenKind::Semi,
+                    TokenKind::Comma,
+                    TokenKind::Colon,
+                    TokenKind::Underscore,
+                ]
+            );
+        }
+
+        #[test]
+        fn op_fat_arrow() {
+            lex_eq!("=>", vec![TokenKind::FatArrow]);
+        }
+
+        #[test]
+        fn op_amp_mut() {
+            lex_eq!("&mut", vec![TokenKind::Amp, TokenKind::Mut]);
+        }
+
+        // Literals — one per `TokenKind` literal variant referenced in §2.
+
+        #[test]
+        fn lit_int_decimal() {
+            lex_eq!(
+                "42",
+                vec![TokenKind::IntLiteral(42, IntSuffix::Unsuffixed)]
+            );
+        }
+
+        #[test]
+        fn lit_int_underscored() {
+            lex_eq!(
+                "1_000_000",
+                vec![TokenKind::IntLiteral(1_000_000, IntSuffix::Unsuffixed)]
+            );
+        }
+
+        #[test]
+        fn lit_int_hex() {
+            lex_eq!(
+                "0xff",
+                vec![TokenKind::IntLiteral(0xff, IntSuffix::Unsuffixed)]
+            );
+        }
+
+        #[test]
+        fn lit_int_binary() {
+            lex_eq!(
+                "0b1010",
+                vec![TokenKind::IntLiteral(0b1010, IntSuffix::Unsuffixed)]
+            );
+        }
+
+        #[test]
+        fn lit_float_simple() {
+            lex_eq!(
+                "3.14",
+                vec![TokenKind::FloatLiteral(3.14, FloatSuffix::Unsuffixed)]
+            );
+        }
+
+        #[test]
+        fn lit_float_exp() {
+            lex_eq!(
+                "1.0e-10",
+                vec![TokenKind::FloatLiteral(1.0e-10, FloatSuffix::Unsuffixed)]
+            );
+        }
+
+        #[test]
+        fn lit_char() {
+            lex_eq!("'a'", vec![TokenKind::CharLiteral('a')]);
+        }
+
+        #[test]
+        fn lit_string() {
+            lex_eq!(
+                "\"hello\"",
+                vec![TokenKind::StringLiteral("hello".into())]
+            );
+        }
+
+        #[test]
+        fn lit_raw_string() {
+            lex_eq!(
+                "r\"raw string\"",
+                vec![TokenKind::RawStringLiteral("raw string".into())]
+            );
+        }
+
+        #[test]
+        fn lit_bool_true() {
+            lex_eq!("true", vec![TokenKind::True]);
+        }
+
+        #[test]
+        fn lit_bool_false() {
+            lex_eq!("false", vec![TokenKind::False]);
+        }
+
+        // Built-in syntax forms drawn from §2's "Built-in Syntax" subsection.
+        // The spec keeps the literal `!` for `vec![…]` even while declaring
+        // these are not macros; the current scanner has no `Bang` variant, so
+        // the `!` snapshots as an `Error` token (see plan Risks).
+
+        #[test]
+        fn builtin_vec_macro() {
+            lex_eq!(
+                "vec![1, 2, 3]",
+                vec![
+                    TokenKind::Ident("vec".into()),
+                    TokenKind::Error("invalid character: !".into()),
+                    TokenKind::LBracket,
+                    TokenKind::IntLiteral(1, IntSuffix::Unsuffixed),
+                    TokenKind::Comma,
+                    TokenKind::IntLiteral(2, IntSuffix::Unsuffixed),
+                    TokenKind::Comma,
+                    TokenKind::IntLiteral(3, IntSuffix::Unsuffixed),
+                    TokenKind::RBracket,
+                ]
+            );
+        }
+
+        #[test]
+        fn builtin_println() {
+            lex_eq!(
+                "println(\"text\")",
+                vec![
+                    TokenKind::Ident("println".into()),
+                    TokenKind::LParen,
+                    TokenKind::StringLiteral("text".into()),
+                    TokenKind::RParen,
+                ]
+            );
+        }
+
+        #[test]
+        fn builtin_format() {
+            lex_eq!(
+                "format(\"Hello {}\", name)",
+                vec![
+                    TokenKind::Ident("format".into()),
+                    TokenKind::LParen,
+                    TokenKind::StringLiteral("Hello {}".into()),
+                    TokenKind::Comma,
+                    TokenKind::Ident("name".into()),
+                    TokenKind::RParen,
+                ]
+            );
+        }
+
+        #[test]
+        fn builtin_array_repeat() {
+            lex_eq!(
+                "[0; 256]",
+                vec![
+                    TokenKind::LBracket,
+                    TokenKind::IntLiteral(0, IntSuffix::Unsuffixed),
+                    TokenKind::Semi,
+                    TokenKind::IntLiteral(256, IntSuffix::Unsuffixed),
+                    TokenKind::RBracket,
+                ]
+            );
+        }
+
+        #[test]
+        fn builtin_assert_msg() {
+            lex_eq!(
+                "assert(x == y, \"x must equal y\")",
+                vec![
+                    TokenKind::Ident("assert".into()),
+                    TokenKind::LParen,
+                    TokenKind::Ident("x".into()),
+                    TokenKind::EqEq,
+                    TokenKind::Ident("y".into()),
+                    TokenKind::Comma,
+                    TokenKind::StringLiteral("x must equal y".into()),
+                    TokenKind::RParen,
+                ]
+            );
+        }
+
+        #[test]
+        fn builtin_derive_attr() {
+            lex_eq!(
+                "#[derive(Clone)]",
+                vec![
+                    TokenKind::Error("invalid character: #".into()),
+                    TokenKind::LBracket,
+                    TokenKind::Ident("derive".into()),
+                    TokenKind::LParen,
+                    TokenKind::Ident("Clone".into()),
+                    TokenKind::RParen,
+                    TokenKind::RBracket,
+                ]
+            );
+        }
+    }
 }
