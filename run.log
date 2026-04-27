@@ -140,3 +140,13 @@
 ==> exec  implement-operator-scanning-with-maximal-munch
       exec: 130.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-operator-scanning-with-maximal-munch-execute-20260427T033825234.txt
       notes: - Used `assert_eq!(&kind, expected_kind, ...)` instead of `assert_eq!(kind, *expected_kind, ...)` because `TokenKind` is not `Copy` (it has `String`-bearing variants), so dereferencing a borrowed slice element would not type-check cleanly. Comparing references is equivalent for `PartialEq` and matches the plan's intent. / - Used `FileId(31)` for both happy-path and rejection scanners in the test. The plan says to assert `span.file_id` matches the constructor argument on happy cases and `pos == 0` on rejections; using a non-zero `FileId` for the rejection scanners doesn't affect the rejection assertions but keeps the constructor argument consistent across the test.
+    [21/113] implement-operator-scanning-with-maximal-munch: plan $0.84 / execute $0.80 / verified / committed f1487bb
+==> plan  implement-keyword-vs-identifier-disambiguation
+      plan: 137.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-keyword-vs-identifier-disambiguation-plan-20260427T034043378.txt
+==> exec  implement-keyword-vs-identifier-disambiguation
+      exec: 64.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-keyword-vs-identifier-disambiguation-execute-20260427T034147436.txt
+      notes: - Used `is_ascii_alphabetic()` for the start-byte check (equivalent to `a..=z | A..=Z`) — it's the canonical std helper and matches the strict ASCII-letter rule from spec §40 the plan called out. / - Used a single `match lex { ... }` over string literals for the keyword table (the plan offered this as one of two options; it noted "a `match` reads cleanest").
+    [22/113] implement-keyword-vs-identifier-disambiguation: plan $1.01 / execute $0.60 / verified / committed 3f0f84c
+==> plan  wire-all-scanners-into-scanner-next-token-driver
+      plan: 86.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\wire-all-scanners-into-scanner-next-token-driver-plan-20260427T034314567.txt
+==> exec  wire-all-scanners-into-scanner-next-token-driver

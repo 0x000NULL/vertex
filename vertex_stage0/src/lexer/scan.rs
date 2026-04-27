@@ -1,6 +1,7 @@
 use crate::lexer::token::DocStyle;
 use crate::lexer::token::FloatSuffix;
 use crate::lexer::token::IntSuffix;
+use crate::lexer::token::Token;
 use crate::lexer::token::TokenKind;
 use crate::span::FileId;
 use crate::span::Span;
@@ -12,6 +13,10 @@ fn hex_digit_value(b: u8) -> u8 {
         b'A'..=b'F' => b - b'A' + 10,
         _ => unreachable!(),
     }
+}
+
+fn is_whitespace(b: u8) -> bool {
+    matches!(b, b' ' | b'\t' | b'\n' | b'\r')
 }
 
 pub struct Scanner<'a> {
@@ -704,6 +709,118 @@ impl<'a> Scanner<'a> {
         }
     }
 
+    fn skip_whitespace_and_comments(&mut self) {
+        loop {
+            let before = self.pos;
+            self.eat_while(is_whitespace);
+            let _ = self.skip_comments();
+            if self.pos == before {
+                break;
+            }
+        }
+    }
+
+    pub fn next_token(&mut self) -> Token {
+        self.skip_whitespace_and_comments();
+
+        let start = self.pos as u32;
+        let first = match self.peek() {
+            Some(b) => b,
+            None => return Token::new(TokenKind::Eof, Span::new(self.file_id, start, start)),
+        };
+
+        if first == b'/' {
+            if let Some((body, style, span)) = self.scan_doc_comment() {
+                return Token::new(TokenKind::DocComment(body, style), span);
+            }
+        }
+
+        if first == b'r' && matches!(self.peek_at(1), Some(b'#') | Some(b'"')) {
+            if let Some((s, span)) = self.scan_raw_string() {
+                return Token::new(TokenKind::RawStringLiteral(s), span);
+            }
+        }
+
+        if first == b'"' {
+            match self.scan_string() {
+                Some((s, span)) => return Token::new(TokenKind::StringLiteral(s), span),
+                None => {
+                    self.pos += 1;
+                    let span = Span::new(self.file_id, start, self.pos as u32);
+                    return Token::new(TokenKind::Error("\"".to_string()), span);
+                }
+            }
+        }
+
+        if first == b'\'' {
+            match self.scan_char() {
+                Some((c, span)) => return Token::new(TokenKind::CharLiteral(c), span),
+                None => {
+                    self.pos += 1;
+                    let span = Span::new(self.file_id, start, self.pos as u32);
+                    return Token::new(TokenKind::Error("'".to_string()), span);
+                }
+            }
+        }
+
+        if first.is_ascii_digit() {
+            if first == b'0' {
+                match self.peek_at(1) {
+                    Some(b'x') | Some(b'X') => {
+                        if let Some((v, suf, span)) = self.scan_int_hex() {
+                            return Token::new(TokenKind::IntLiteral(v, suf), span);
+                        }
+                    }
+                    Some(b'b') | Some(b'B') => {
+                        if let Some((v, suf, span)) = self.scan_int_bin() {
+                            return Token::new(TokenKind::IntLiteral(v, suf), span);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if let Some((v, suf, span)) = self.scan_float() {
+                return Token::new(TokenKind::FloatLiteral(v, suf), span);
+            }
+            let (v, suf, span) = self.scan_int_decimal();
+            return Token::new(TokenKind::IntLiteral(v, suf), span);
+        }
+
+        if first.is_ascii_alphabetic() {
+            if let Some((kind, span)) = self.scan_ident_or_keyword() {
+                return Token::new(kind, span);
+            }
+        }
+
+        if first == b'_' {
+            let cont = self
+                .peek_at(1)
+                .map_or(false, |b| b.is_ascii_alphanumeric() || b == b'_');
+            if cont {
+                let lex_start = self.pos;
+                self.pos += 1;
+                self.eat_while(|b| b.is_ascii_alphanumeric() || b == b'_');
+                let lex = self.src[lex_start..self.pos].to_string();
+                let span = Span::new(self.file_id, start, self.pos as u32);
+                return Token::new(TokenKind::Ident(lex), span);
+            } else {
+                self.pos += 1;
+                let span = Span::new(self.file_id, start, self.pos as u32);
+                return Token::new(TokenKind::Underscore, span);
+            }
+        }
+
+        if let Some((kind, span)) = self.scan_operator() {
+            return Token::new(kind, span);
+        }
+
+        let rest = &self.src[self.pos..];
+        let ch = rest.chars().next().expect("peek was Some, so a char must exist");
+        self.pos += ch.len_utf8();
+        let span = Span::new(self.file_id, start, self.pos as u32);
+        Token::new(TokenKind::Error(ch.to_string()), span)
+    }
+
     fn scan_int_suffix(&mut self) -> IntSuffix {
         const SUFFIXES: &[(&[u8], IntSuffix)] = &[
             (b"isize", IntSuffix::ISize),
@@ -1314,6 +1431,116 @@ mod tests {
                 input
             );
             assert_eq!(s.pos, 0, "expected pos=0 after rejecting {:?}", input);
+        }
+    }
+
+    #[test]
+    fn tokenizes_full_program() {
+        let src = "/// doc\nfn let if foo _ _bar 123 0xFF 0b101 1.5 'a' \"hi\" r\"raw\"\n// line comment\n/* block */\n+ - * / % == != <= >= << >> .. ..= -> => :: ; , ( ) { } [ ] ? & | ^ ~ . : = ";
+        let mut s = Scanner::new(src, FileId(99));
+
+        let mut tokens: Vec<Token> = Vec::new();
+        loop {
+            let t = s.next_token();
+            let is_eof = matches!(&t.kind, TokenKind::Eof);
+            tokens.push(t);
+            if is_eof {
+                break;
+            }
+        }
+
+        let kinds: Vec<TokenKind> = tokens.iter().map(|t| t.kind.clone()).collect();
+
+        let expected: Vec<TokenKind> = vec![
+            TokenKind::DocComment(" doc".to_string(), DocStyle::Outer),
+            TokenKind::Fn,
+            TokenKind::Let,
+            TokenKind::If,
+            TokenKind::Ident("foo".to_string()),
+            TokenKind::Underscore,
+            TokenKind::Ident("_bar".to_string()),
+            TokenKind::IntLiteral(123, IntSuffix::Unsuffixed),
+            TokenKind::IntLiteral(255, IntSuffix::Unsuffixed),
+            TokenKind::IntLiteral(5, IntSuffix::Unsuffixed),
+            TokenKind::FloatLiteral(1.5, FloatSuffix::Unsuffixed),
+            TokenKind::CharLiteral('a'),
+            TokenKind::StringLiteral("hi".to_string()),
+            TokenKind::RawStringLiteral("raw".to_string()),
+            TokenKind::Plus,
+            TokenKind::Minus,
+            TokenKind::Star,
+            TokenKind::Slash,
+            TokenKind::Percent,
+            TokenKind::EqEq,
+            TokenKind::BangEq,
+            TokenKind::Le,
+            TokenKind::Ge,
+            TokenKind::Shl,
+            TokenKind::Shr,
+            TokenKind::DotDot,
+            TokenKind::DotDotEq,
+            TokenKind::Arrow,
+            TokenKind::FatArrow,
+            TokenKind::ColonColon,
+            TokenKind::Semi,
+            TokenKind::Comma,
+            TokenKind::LParen,
+            TokenKind::RParen,
+            TokenKind::LBrace,
+            TokenKind::RBrace,
+            TokenKind::LBracket,
+            TokenKind::RBracket,
+            TokenKind::Question,
+            TokenKind::Amp,
+            TokenKind::Pipe,
+            TokenKind::Caret,
+            TokenKind::Tilde,
+            TokenKind::Dot,
+            TokenKind::Colon,
+            TokenKind::Eq,
+            TokenKind::Eof,
+        ];
+
+        assert_eq!(kinds, expected);
+
+        let mut prev_end: u32 = 0;
+        for t in &tokens {
+            assert_eq!(t.span.file_id, FileId(99), "file_id for {:?}", t.kind);
+            match &t.kind {
+                TokenKind::Eof => {
+                    assert_eq!(
+                        t.span.start, t.span.end,
+                        "Eof span must be empty, got {:?}",
+                        t.span
+                    );
+                    assert_eq!(t.span.start as usize, src.len(), "Eof at end of input");
+                }
+                _ => {
+                    assert!(
+                        !t.span.is_empty(),
+                        "non-Eof token {:?} has empty span {:?}",
+                        t.kind,
+                        t.span
+                    );
+                }
+            }
+            assert!(
+                t.span.start >= prev_end,
+                "spans not non-decreasing: prev_end={}, token={:?}",
+                prev_end,
+                t
+            );
+            let gap = &src[prev_end as usize..t.span.start as usize];
+            let mut gap_scanner = Scanner::new(gap, FileId(99));
+            gap_scanner.skip_whitespace_and_comments();
+            assert_eq!(
+                gap_scanner.pos,
+                gap.len(),
+                "gap before {:?} contains non-whitespace/comment content: {:?}",
+                t.kind,
+                gap
+            );
+            prev_end = t.span.end;
         }
     }
 

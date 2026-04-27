@@ -197,7 +197,7 @@
   - [ ] Read identifier; map against the 29 keywords table; otherwise emit `Ident`
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::keywords_take_priority_over_idents`
 
-- [ ] Wire all scanners into `Scanner::next_token` driver
+- [x] Wire all scanners into `Scanner::next_token` driver
   - [ ] `pub fn next_token(&mut self) -> Token`
   - [ ] Skip whitespace + comments; dispatch on first char
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::tokenizes_full_program`
