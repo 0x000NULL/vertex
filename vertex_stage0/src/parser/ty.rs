@@ -1,6 +1,6 @@
 use crate::ast::expr::{Path, PathSegment};
 use crate::ast::ty::Type;
-use crate::error::CompileError;
+use crate::error::{CompileError, ErrorCode, ErrorKind};
 use crate::lexer::token::TokenKind;
 use crate::parser::Parser;
 use crate::span::Span;
@@ -9,6 +9,9 @@ impl Parser {
     pub fn parse_type(&mut self) -> Result<Type, CompileError> {
         if matches!(self.peek(), TokenKind::Amp) {
             return self.parse_ref_type();
+        }
+        if matches!(self.peek(), TokenKind::Star) {
+            return self.parse_ptr_type();
         }
         // Stopgap path-type body: replaced by `parse-path-types-with-generic-args`.
         let ident_tok = self.expect(&TokenKind::Ident(String::new()))?;
@@ -26,6 +29,38 @@ impl Parser {
                 generic_args: Vec::new(),
             }],
         }))
+    }
+
+    fn parse_ptr_type(&mut self) -> Result<Type, CompileError> {
+        debug_assert!(matches!(self.peek(), TokenKind::Star));
+        let star_tok = self.bump();
+
+        let mutable = match self.peek() {
+            TokenKind::Mut => {
+                self.bump();
+                true
+            }
+            TokenKind::Const => {
+                self.bump();
+                false
+            }
+            _ => {
+                let err = CompileError::new(
+                    ErrorCode::E0100,
+                    ErrorKind::Syntax,
+                    star_tok.span,
+                    "expected `const` or `mut` after `*`",
+                );
+                self.errors.push(err);
+                false
+            }
+        };
+
+        let inner = self.parse_type()?;
+        Ok(Type::Ptr {
+            mutable,
+            ty: Box::new(inner),
+        })
     }
 
     fn parse_ref_type(&mut self) -> Result<Type, CompileError> {
@@ -61,6 +96,7 @@ fn type_span(ty: &Type) -> Span {
     match ty {
         Type::Path(p) => p.span,
         Type::Ref { span, .. } => *span,
+        Type::Ptr { ty, .. } => type_span(ty),
         _ => unreachable!("type_span: unexpected variant from stopgap parse_type"),
     }
 }
@@ -154,6 +190,74 @@ mod tests {
                 }
             }
             other => panic!("expected outer Type::Ref, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+    }
+
+    #[test]
+    fn raw_ptr_types() {
+        // *const i32
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Star),
+            tok(TokenKind::Const),
+            ident_tok("i32"),
+            tok(TokenKind::Eof),
+        ]);
+        let ty = p.parse_type().expect("parse_type *const i32");
+        match ty {
+            Type::Ptr { mutable, ty } => {
+                assert!(!mutable);
+                assert_path_ident(&ty, "i32");
+            }
+            other => panic!("expected Type::Ptr, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // *mut i32
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Star),
+            tok(TokenKind::Mut),
+            ident_tok("i32"),
+            tok(TokenKind::Eof),
+        ]);
+        let ty = p.parse_type().expect("parse_type *mut i32");
+        match ty {
+            Type::Ptr { mutable, ty } => {
+                assert!(mutable);
+                assert_path_ident(&ty, "i32");
+            }
+            other => panic!("expected Type::Ptr, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // *const *mut i32
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Star),
+            tok(TokenKind::Const),
+            tok(TokenKind::Star),
+            tok(TokenKind::Mut),
+            ident_tok("i32"),
+            tok(TokenKind::Eof),
+        ]);
+        let ty = p.parse_type().expect("parse_type *const *mut i32");
+        match ty {
+            Type::Ptr { mutable, ty } => {
+                assert!(!mutable);
+                match *ty {
+                    Type::Ptr {
+                        mutable: inner_mut,
+                        ty: inner_ty,
+                    } => {
+                        assert!(inner_mut);
+                        assert_path_ident(&inner_ty, "i32");
+                    }
+                    other => panic!("expected inner Type::Ptr, got {:?}", other),
+                }
+            }
+            other => panic!("expected outer Type::Ptr, got {:?}", other),
         }
         assert!(p.errors.is_empty());
         assert!(matches!(p.peek(), TokenKind::Eof));

@@ -526,7 +526,7 @@
   - [ ] `&T`, `&mut T`, `&'static str` (lifetime is parsed but ignored semantically — Stage 0 simplification)
   - [ ] **Verify:** `cargo test --lib parser::ty::tests::ref_types`
 
-- [ ] Parse raw pointer types
+- [x] Parse raw pointer types
   - [ ] `*const T`, `*mut T`
   - [ ] **Verify:** `cargo test --lib parser::ty::tests::raw_ptr_types`
 
