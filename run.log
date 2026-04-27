@@ -178,3 +178,11 @@
       notes: - Test source uses single-space separators between malformed runs and idents (`"0x foo 0xg bar ..."`); the lexeme-locator in the test uses `src.find(lex)` because each malformed run's full lexeme appears at exactly one position in this fixture, which keeps the assertion robust without manually hand-counting offsets. / - The Error message format `"invalid numeric literal: <lex>"` mirrors the `"invalid character: <ch>"` style already pinned by `invalid_char_recovers`, per the plan's assumption block.
     [27/113] invalid-numeric-literal-recovery: plan $0.44 / execute $0.83 / verified / committed 895603c
 ==> plan  fuzz-style-robustness-test
+      plan: 92.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\fuzz-style-robustness-test-plan-20260427T040111812.txt
+==> exec  fuzz-style-robustness-test
+      exec: 71.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\fuzz-style-robustness-test-execute-20260427T040222852.txt
+      notes: - Inserted `fn next_rand` and `#[test] fn fuzz_random_bytes_no_panic` immediately before the closing `}` of `mod tests`, so they sit alongside the existing tests rather than at any other position. The test path is `lexer::scan::tests::fuzz_random_bytes_no_panic`, matching the Verify command exactly. / - Used `(next_rand(&mut state) as usize) % 257` to draw `0..=256` inclusive, as the plan specifies `0..=256`.
+    [28/113] fuzz-style-robustness-test: plan $0.53 / execute $0.42 / verified / committed 80daf6a
+==> plan  snapshot-test-helper-macro-in-src-lexer-test-util-rs
+      plan: 52.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\snapshot-test-helper-macro-in-src-lexer-test-util-rs-plan-20260427T040315630.txt
+==> exec  snapshot-test-helper-macro-in-src-lexer-test-util-rs

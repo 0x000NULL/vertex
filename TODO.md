@@ -230,7 +230,7 @@
 
 ## 6. Lexer test infrastructure
 
-- [ ] Snapshot-test helper macro in `src/lexer/test_util.rs`
+- [x] Snapshot-test helper macro in `src/lexer/test_util.rs`
   - [ ] `macro_rules! lex_eq { ($input:expr, $expected:expr) => { ... } }`
   - [ ] Compare token kind list (drop spans for snapshot brevity)
   - [ ] **Verify:** `cargo test --lib lexer::test_util::tests::macro_works`
