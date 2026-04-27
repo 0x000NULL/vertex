@@ -1,9 +1,9 @@
 use crate::ast::expr::{Expr, GenericArg, IntLit, Path, PathSegment};
 use crate::ast::generics::{Generics, TraitBound, TypeParam, WhereClause, WherePred};
 use crate::ast::item::{
-    ConstDef, EnumDef, EnumVariant, Field, FnDef, Item, ModDef, ModKind, Param, StructDef,
-    StructKind, TraitDef, TraitItem, TraitItemConst, TraitItemFn, TraitItemType, UseDef, UseTree,
-    VariantKind,
+    ConstDef, EnumDef, EnumVariant, Field, FnDef, Item, ModDef, ModKind, Param, StaticDef,
+    StructDef, StructKind, TraitDef, TraitItem, TraitItemConst, TraitItemFn, TraitItemType, UseDef,
+    UseTree, VariantKind,
 };
 use crate::ast::ty::Type;
 use crate::error::{CompileError, ErrorCode, ErrorKind};
@@ -1089,6 +1089,37 @@ impl Parser {
             name,
             ty,
             value,
+        }))
+    }
+
+    pub fn parse_static(&mut self) -> Result<Item, CompileError> {
+        let static_kw = self.expect(&TokenKind::Static)?;
+        let start_span = static_kw.span;
+
+        let is_mut = self.eat(&TokenKind::Mut);
+
+        let name_tok = self.expect(&TokenKind::Ident(String::new()))?;
+        let name = match name_tok.kind {
+            TokenKind::Ident(s) => s,
+            _ => unreachable!(),
+        };
+
+        self.expect(&TokenKind::Colon)?;
+        let ty = self.parse_type()?;
+        self.expect(&TokenKind::Eq)?;
+        let value = self.parse_expr()?;
+        let semi_tok = self.expect(&TokenKind::Semi)?;
+        let end_span = semi_tok.span;
+
+        let span = start_span.merge(&end_span);
+        let id = self.new_node_id();
+        Ok(Item::Static(StaticDef {
+            id,
+            span,
+            name,
+            ty,
+            value,
+            is_mut,
         }))
     }
 }
@@ -2232,6 +2263,61 @@ mod tests {
             Expr::IntLit(lit) => assert_eq!(lit.value, 1),
             other => panic!("expected Expr::IntLit, got {:?}", other),
         }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+    }
+
+    fn as_static(item: Item) -> StaticDef {
+        match item {
+            Item::Static(s) => s,
+            other => panic!("expected Item::Static, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn static_item() {
+        // static N: i32 = 1i32;
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Static),
+            ident_tok("N"),
+            tok(TokenKind::Colon),
+            ident_tok("i32"),
+            tok(TokenKind::Eq),
+            int_tok(1),
+            tok(TokenKind::Semi),
+            tok(TokenKind::Eof),
+        ]);
+        let s = as_static(p.parse_static().expect("parse_static"));
+        assert_eq!(s.name, "N");
+        assert_eq!(type_ident(&s.ty), "i32");
+        match &s.value {
+            Expr::IntLit(lit) => assert_eq!(lit.value, 1),
+            other => panic!("expected Expr::IntLit, got {:?}", other),
+        }
+        assert!(!s.is_mut);
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // static mut N: i32 = 1i32;
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Static),
+            tok(TokenKind::Mut),
+            ident_tok("N"),
+            tok(TokenKind::Colon),
+            ident_tok("i32"),
+            tok(TokenKind::Eq),
+            int_tok(1),
+            tok(TokenKind::Semi),
+            tok(TokenKind::Eof),
+        ]);
+        let s = as_static(p.parse_static().expect("parse_static"));
+        assert_eq!(s.name, "N");
+        assert_eq!(type_ident(&s.ty), "i32");
+        match &s.value {
+            Expr::IntLit(lit) => assert_eq!(lit.value, 1),
+            other => panic!("expected Expr::IntLit, got {:?}", other),
+        }
+        assert!(s.is_mut);
         assert!(p.errors.is_empty());
         assert!(matches!(p.peek(), TokenKind::Eof));
     }

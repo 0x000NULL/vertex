@@ -199,6 +199,10 @@ pub struct ConstDef {
 pub struct StaticDef {
     pub id: NodeId,
     pub span: Span,
+    pub name: String,
+    pub ty: Type,
+    pub value: Expr,
+    pub is_mut: bool,
 }
 
 #[allow(dead_code)]

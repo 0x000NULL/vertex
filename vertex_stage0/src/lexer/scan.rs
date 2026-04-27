@@ -606,6 +606,7 @@ impl<'a> Scanner<'a> {
             "return" => TokenKind::Return,
             "self" => TokenKind::SelfLower,
             "Self" => TokenKind::SelfUpper,
+            "static" => TokenKind::Static,
             "struct" => TokenKind::Struct,
             "trait" => TokenKind::Trait,
             "true" => TokenKind::True,
@@ -1383,6 +1384,7 @@ mod tests {
             ("return", TokenKind::Return),
             ("self", TokenKind::SelfLower),
             ("Self", TokenKind::SelfUpper),
+            ("static", TokenKind::Static),
             ("struct", TokenKind::Struct),
             ("trait", TokenKind::Trait),
             ("true", TokenKind::True),
@@ -2040,6 +2042,11 @@ mod tests {
         #[test]
         fn kw_self_upper() {
             lex_eq!("Self", vec![TokenKind::SelfUpper]);
+        }
+
+        #[test]
+        fn kw_static() {
+            lex_eq!("static", vec![TokenKind::Static]);
         }
 
         #[test]

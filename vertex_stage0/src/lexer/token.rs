@@ -53,6 +53,7 @@ pub enum TokenKind {
     Return,
     SelfLower,
     SelfUpper,
+    Static,
     Struct,
     Trait,
     True,

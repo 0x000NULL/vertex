@@ -591,3 +591,11 @@
       notes: - `parse_use_tree_group` is factored out as a private helper rather than inlined inside `parse_use_tree`. The plan describes a "Nested-group helper" so I gave it a name; both call sites (top-level `{...}` and `prefix::{...}`) reuse it. / - For trailing-comma handling I check `RBrace` after each `Comma`, so `{ a, b, }` is accepted but `{ , }` would still try to parse a tree (the spec only requires trailing comma support, which works).
     [40/72] parse-use-items-nested-glob: plan $0.69 / execute $1.31 / verified / committed 5751d03
 ==> plan  parse-const-items
+      plan: 126.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-const-items-plan-20260427T082147564.txt
+==> exec  parse-const-items
+      exec: 105.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-const-items-execute-20260427T082332609.txt
+      notes: - None. The plan was unambiguous and all four steps were applied verbatim. The new `parse_const` method was placed at the end of the `impl Parser` block (right after `parse_mod_inline_item`), and the new `as_const` helper plus `const_item` test were placed at the end of the `tests` module after `use_nested_glob_pub`, matching the trailing position used by recently added items.
+    [41/72] parse-const-items: plan $1.10 / execute $0.90 / verified / committed 3a1be85
+==> plan  parse-static-and-static-mut-items
+      plan: 157.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-static-and-static-mut-items-plan-20260427T082610835.txt
+==> exec  parse-static-and-static-mut-items

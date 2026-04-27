@@ -506,7 +506,7 @@
   - [ ] `const NAME: T = expr;`
   - [ ] **Verify:** `cargo test --lib parser::item::tests::const_item`
 
-- [ ] Parse `static` and `static mut` items
+- [x] Parse `static` and `static mut` items
   - [ ] `static NAME: T = expr;`, `static mut NAME: T = expr;`
   - [ ] **Verify:** `cargo test --lib parser::item::tests::static_item`
 

@@ -212,6 +212,7 @@ fn describe(kind: &TokenKind) -> &'static str {
         TokenKind::Return => "`return`",
         TokenKind::SelfLower => "`self`",
         TokenKind::SelfUpper => "`Self`",
+        TokenKind::Static => "`static`",
         TokenKind::Struct => "`struct`",
         TokenKind::Trait => "`trait`",
         TokenKind::True => "`true`",
