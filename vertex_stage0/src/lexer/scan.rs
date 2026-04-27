@@ -2,6 +2,15 @@ use crate::lexer::token::IntSuffix;
 use crate::span::FileId;
 use crate::span::Span;
 
+fn hex_digit_value(b: u8) -> u8 {
+    match b {
+        b'0'..=b'9' => b - b'0',
+        b'a'..=b'f' => b - b'a' + 10,
+        b'A'..=b'F' => b - b'A' + 10,
+        _ => unreachable!(),
+    }
+}
+
 pub struct Scanner<'a> {
     pub src: &'a str,
     pub bytes: &'a [u8],
@@ -75,6 +84,92 @@ impl<'a> Scanner<'a> {
         let suffix = self.scan_int_suffix();
         let end = self.pos as u32;
         (value, suffix, Span::new(self.file_id, start, end))
+    }
+
+    pub fn scan_int_hex(&mut self) -> Option<(u64, IntSuffix, Span)> {
+        let start = self.pos as u32;
+        self.pos += 2;
+
+        let mut value: u64 = 0;
+        let mut overflow = false;
+        let mut saw_digit = false;
+
+        while let Some(b) = self.peek() {
+            if b.is_ascii_hexdigit() {
+                saw_digit = true;
+                if !overflow {
+                    let d = hex_digit_value(b) as u64;
+                    match value.checked_mul(16).and_then(|v| v.checked_add(d)) {
+                        Some(v) => value = v,
+                        None => {
+                            overflow = true;
+                        }
+                    }
+                }
+                self.pos += 1;
+            } else if b == b'_' {
+                self.pos += 1;
+            } else {
+                break;
+            }
+        }
+
+        if !saw_digit {
+            self.pos = start as usize;
+            return None;
+        }
+
+        if overflow {
+            value = u64::MAX;
+        }
+
+        let suffix = self.scan_int_suffix();
+        let end = self.pos as u32;
+        Some((value, suffix, Span::new(self.file_id, start, end)))
+    }
+
+    pub fn scan_int_bin(&mut self) -> Option<(u64, IntSuffix, Span)> {
+        let start = self.pos as u32;
+        self.pos += 2;
+
+        let mut value: u64 = 0;
+        let mut overflow = false;
+        let mut saw_digit = false;
+
+        while let Some(b) = self.peek() {
+            if b == b'0' || b == b'1' {
+                saw_digit = true;
+                if !overflow {
+                    match value
+                        .checked_mul(2)
+                        .and_then(|v| v.checked_add((b - b'0') as u64))
+                    {
+                        Some(v) => value = v,
+                        None => {
+                            overflow = true;
+                        }
+                    }
+                }
+                self.pos += 1;
+            } else if b == b'_' {
+                self.pos += 1;
+            } else {
+                break;
+            }
+        }
+
+        if !saw_digit {
+            self.pos = start as usize;
+            return None;
+        }
+
+        if overflow {
+            value = u64::MAX;
+        }
+
+        let suffix = self.scan_int_suffix();
+        let end = self.pos as u32;
+        Some((value, suffix, Span::new(self.file_id, start, end)))
     }
 
     fn scan_int_suffix(&mut self) -> IntSuffix {
@@ -174,6 +269,59 @@ mod tests {
             );
             assert_eq!(s.pos, input.len(), "pos for {:?}", input);
         }
+    }
+
+    #[test]
+    fn hex_and_bin_literals() {
+        let happy_hex: &[(&str, u64, IntSuffix)] = &[
+            ("0x1F", 31, IntSuffix::Unsuffixed),
+            ("0xff_ffu32", 65535, IntSuffix::U32),
+            ("0xDEAD_BEEFi64", 0xDEAD_BEEF, IntSuffix::I64),
+            ("0xAbCd", 0xABCD, IntSuffix::Unsuffixed),
+        ];
+        for (input, expected_value, expected_suffix) in happy_hex {
+            let mut s = Scanner::new(input, FileId(3));
+            let (value, suffix, span) = s.scan_int_hex().expect(input);
+            assert_eq!(value, *expected_value, "value for {:?}", input);
+            assert_eq!(suffix, *expected_suffix, "suffix for {:?}", input);
+            assert_eq!(span.file_id, FileId(3), "file_id for {:?}", input);
+            assert_eq!(span.start, 0, "span.start for {:?}", input);
+            assert_eq!(span.end as usize, input.len(), "span.end for {:?}", input);
+            assert_eq!(s.pos, input.len(), "pos for {:?}", input);
+        }
+
+        let happy_bin: &[(&str, u64, IntSuffix)] = &[
+            ("0b0", 0, IntSuffix::Unsuffixed),
+            ("0b1010_1010", 170, IntSuffix::Unsuffixed),
+            ("0b1111_1111u8", 255, IntSuffix::U8),
+        ];
+        for (input, expected_value, expected_suffix) in happy_bin {
+            let mut s = Scanner::new(input, FileId(3));
+            let (value, suffix, span) = s.scan_int_bin().expect(input);
+            assert_eq!(value, *expected_value, "value for {:?}", input);
+            assert_eq!(suffix, *expected_suffix, "suffix for {:?}", input);
+            assert_eq!(span.file_id, FileId(3), "file_id for {:?}", input);
+            assert_eq!(span.start, 0, "span.start for {:?}", input);
+            assert_eq!(span.end as usize, input.len(), "span.end for {:?}", input);
+            assert_eq!(s.pos, input.len(), "pos for {:?}", input);
+        }
+
+        for input in &["0x", "0xg", "0x_"] {
+            let mut s = Scanner::new(input, FileId(0));
+            assert!(s.scan_int_hex().is_none(), "expected None for {:?}", input);
+            assert_eq!(s.pos, 0, "expected pos=0 after rejecting {:?}", input);
+        }
+
+        for input in &["0b", "0b2", "0b_"] {
+            let mut s = Scanner::new(input, FileId(0));
+            assert!(s.scan_int_bin().is_none(), "expected None for {:?}", input);
+            assert_eq!(s.pos, 0, "expected pos=0 after rejecting {:?}", input);
+        }
+
+        let mut overflow = Scanner::new("0xFFFF_FFFF_FFFF_FFFF_F", FileId(0));
+        let (value, suffix, _) = overflow.scan_int_hex().expect("overflow input");
+        assert_eq!(value, u64::MAX);
+        assert_eq!(suffix, IntSuffix::Unsuffixed);
     }
 
     #[test]

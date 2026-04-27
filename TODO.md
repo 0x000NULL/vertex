@@ -152,7 +152,7 @@
   - [ ] Handle suffix parse (i8/i16/i32/i64/isize/u8/.../usize)
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::decimal_int_with_underscores_and_suffix`
 
-- [ ] Implement hex (`0x`) and binary (`0b`) int literal scanning
+- [x] Implement hex (`0x`) and binary (`0b`) int literal scanning
   - [ ] Extend `scan_int_decimal` or add `scan_int_hex` / `scan_int_bin`
   - [ ] Handle `_` separators; reject empty digit run after prefix
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::hex_and_bin_literals`

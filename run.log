@@ -86,3 +86,11 @@
 ==> exec  implement-scanner-struct-in-src-lexer-scan-rs
       exec: 55.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-scanner-struct-in-src-lexer-scan-rs-execute-20260427T031236719.txt
       notes: - Module declaration ordering: placed `pub mod scan;` above `pub mod token;` (alphabetical) rather than below; the plan said "next to" without specifying order. / - `Scanner` was not given a `#[derive(...)]` because the plan's struct signature did not request one and downstream usage hasn't been specified yet. Conservative choice: omit derives until needed.
+    [12/113] implement-scanner-struct-in-src-lexer-scan-rs: plan $0.29 / execute $0.41 / verified / committed fef694a
+==> plan  implement-decimal-int-literal-scanning
+      plan: 60.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-decimal-int-literal-scanning-plan-20260427T031337981.txt
+==> exec  implement-decimal-int-literal-scanning
+      exec: 59.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-decimal-int-literal-scanning-execute-20260427T031437037.txt
+      notes: - Suffix matching was factored into a private helper `scan_int_suffix` to keep `scan_int_decimal` readable; this is internal and does not change the plan's external surface (only `scan_int_decimal` is `pub`). / - Step 3 offered "small `String` accumulator" or "fold into `u64` directly via `checked_*`" — chose the direct `checked_*` fold (avoids an allocation, and the plan calls out this option explicitly).
+    [13/113] implement-decimal-int-literal-scanning: plan $0.32 / execute $0.40 / verified / committed 27c955f
+==> plan  implement-hex-0x-and-binary-0b-int-literal-scanning
