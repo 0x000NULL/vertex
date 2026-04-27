@@ -12,25 +12,6 @@ use crate::parser::Parser;
 use crate::span::Span;
 
 impl Parser {
-    // Stopgap: replaced by `parse-path-types-with-generic-args`.
-    fn parse_type(&mut self) -> Result<Type, CompileError> {
-        let ident_tok = self.expect(&TokenKind::Ident(String::new()))?;
-        let span = ident_tok.span;
-        let ident = match ident_tok.kind {
-            TokenKind::Ident(s) => s,
-            _ => unreachable!(),
-        };
-        let id = self.new_node_id();
-        Ok(Type::Path(Path {
-            id,
-            span,
-            segments: vec![PathSegment {
-                ident,
-                generic_args: Vec::new(),
-            }],
-        }))
-    }
-
     /// Stopgap helper for self-parameter explicit types: accepts a
     /// single-segment path with one optional generic argument
     /// (e.g. `Box<Self>`, `Rc<Self>`). Replaced by the general path-type

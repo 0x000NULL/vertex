@@ -522,7 +522,7 @@
   - [ ] `Vec<T>`, `HashMap<String, Vec<i32>>`
   - [ ] **Verify:** `cargo test --lib parser::ty::tests::path_with_generics`
 
-- [ ] Parse reference types
+- [x] Parse reference types
   - [ ] `&T`, `&mut T`, `&'static str` (lifetime is parsed but ignored semantically — Stage 0 simplification)
   - [ ] **Verify:** `cargo test --lib parser::ty::tests::ref_types`
 

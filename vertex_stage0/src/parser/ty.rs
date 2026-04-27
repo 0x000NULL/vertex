@@ -1,0 +1,161 @@
+use crate::ast::expr::{Path, PathSegment};
+use crate::ast::ty::Type;
+use crate::error::CompileError;
+use crate::lexer::token::TokenKind;
+use crate::parser::Parser;
+use crate::span::Span;
+
+impl Parser {
+    pub fn parse_type(&mut self) -> Result<Type, CompileError> {
+        if matches!(self.peek(), TokenKind::Amp) {
+            return self.parse_ref_type();
+        }
+        // Stopgap path-type body: replaced by `parse-path-types-with-generic-args`.
+        let ident_tok = self.expect(&TokenKind::Ident(String::new()))?;
+        let span = ident_tok.span;
+        let ident = match ident_tok.kind {
+            TokenKind::Ident(s) => s,
+            _ => unreachable!(),
+        };
+        let id = self.new_node_id();
+        Ok(Type::Path(Path {
+            id,
+            span,
+            segments: vec![PathSegment {
+                ident,
+                generic_args: Vec::new(),
+            }],
+        }))
+    }
+
+    fn parse_ref_type(&mut self) -> Result<Type, CompileError> {
+        debug_assert!(matches!(self.peek(), TokenKind::Amp));
+        let amp_tok = self.bump();
+        let start_span = amp_tok.span;
+
+        // Defensive lifetime swallow: when the lexer learns to emit lifetime
+        // tokens (today it does not), an `Ident` whose name begins with `'`
+        // is the most likely shape. Discard it; `Type::Ref` carries no
+        // lifetime field in Stage 0.
+        if let TokenKind::Ident(name) = self.peek() {
+            if name.starts_with('\'') {
+                self.bump();
+            }
+        }
+
+        let mutable = self.eat(&TokenKind::Mut);
+        let inner = self.parse_type()?;
+        let inner_span = type_span(&inner);
+        let span = start_span.merge(&inner_span);
+        let id = self.new_node_id();
+        Ok(Type::Ref {
+            mutable,
+            ty: Box::new(inner),
+            span,
+            id,
+        })
+    }
+}
+
+fn type_span(ty: &Type) -> Span {
+    match ty {
+        Type::Path(p) => p.span,
+        Type::Ref { span, .. } => *span,
+        _ => unreachable!("type_span: unexpected variant from stopgap parse_type"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lexer::token::Token;
+    use crate::span::FileId;
+
+    fn tok(kind: TokenKind) -> Token {
+        Token::new(kind, Span::new(FileId(0), 0, 0))
+    }
+
+    fn ident_tok(s: &str) -> Token {
+        tok(TokenKind::Ident(s.to_string()))
+    }
+
+    fn assert_path_ident(ty: &Type, expected: &str) {
+        match ty {
+            Type::Path(p) => {
+                assert_eq!(p.segments.len(), 1, "expected single-segment path");
+                assert!(
+                    p.segments[0].generic_args.is_empty(),
+                    "expected no generic args",
+                );
+                assert_eq!(p.segments[0].ident, expected);
+            }
+            other => panic!("expected Type::Path, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn ref_types() {
+        // &i32
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Amp),
+            ident_tok("i32"),
+            tok(TokenKind::Eof),
+        ]);
+        let ty = p.parse_type().expect("parse_type &i32");
+        match ty {
+            Type::Ref { mutable, ty, .. } => {
+                assert!(!mutable);
+                assert_path_ident(&ty, "i32");
+            }
+            other => panic!("expected Type::Ref, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // &mut i32
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Amp),
+            tok(TokenKind::Mut),
+            ident_tok("i32"),
+            tok(TokenKind::Eof),
+        ]);
+        let ty = p.parse_type().expect("parse_type &mut i32");
+        match ty {
+            Type::Ref { mutable, ty, .. } => {
+                assert!(mutable);
+                assert_path_ident(&ty, "i32");
+            }
+            other => panic!("expected Type::Ref, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // &&i32
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Amp),
+            tok(TokenKind::Amp),
+            ident_tok("i32"),
+            tok(TokenKind::Eof),
+        ]);
+        let ty = p.parse_type().expect("parse_type &&i32");
+        match ty {
+            Type::Ref { mutable, ty, .. } => {
+                assert!(!mutable);
+                match *ty {
+                    Type::Ref {
+                        mutable: inner_mut,
+                        ty: inner_ty,
+                        ..
+                    } => {
+                        assert!(!inner_mut);
+                        assert_path_ident(&inner_ty, "i32");
+                    }
+                    other => panic!("expected inner Type::Ref, got {:?}", other),
+                }
+            }
+            other => panic!("expected outer Type::Ref, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+    }
+}

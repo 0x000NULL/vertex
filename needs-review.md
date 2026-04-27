@@ -334,3 +334,16 @@ plan=1.485589 exec=1.56351175 total=3.04910075
 
 ---
 
+
+## parse-path-types-with-generic-args
+- Item: Parse path types with generic args
+- Reason: cost ceiling
+- Timestamp: 2026-04-27T08:38:35.2315297Z
+
+### Detail
+```
+plan=1.2355375 exec=2.19231825 total=3.42785575
+```
+
+---
+

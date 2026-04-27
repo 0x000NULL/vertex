@@ -601,3 +601,15 @@
 ==> exec  parse-static-and-static-mut-items
       exec: 164.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-static-and-static-mut-items-execute-20260427T082854872.txt
       notes: - The plan said to put the `lex_eq!("static", ...)` line "near the existing `lex_eq!("const", ...)` so the lexer test suite stays consistent." The existing `kw_*` tests follow alphabetical order (the same order as the keyword match arm). I placed `kw_static` between `kw_self_upper` and `kw_struct` to preserve that alphabetical grouping rather than literally adjacent to `kw_const`. Same convention applied to the keyword table entry. / - The plan did not anticipate that the exhaustive `describe` match in `src/parser/mod.rs` would force a new arm. I added `TokenKind::Static => "\`static\`"` (consistent with surrounding keyword arms) so the build would compile; this is the minimal change required.
+    [42/72] parse-static-and-static-mut-items: plan $1.08 / execute $1.40 / verified / committed df26108
+==> plan  parse-type-alias-items
+      plan: 88.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-type-alias-items-plan-20260427T083024935.txt
+==> exec  parse-type-alias-items
+      exec: 91.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-type-alias-items-execute-20260427T083155980.txt
+      notes: - Followed the `parse_struct` pattern (rather than `parse_const`) for generics handling, since `parse_const`/`parse_static` don't take generics — using `generic_params` + `generics_list_span` locals merged after the body, matching how struct/enum already do it. / - Did not touch `parse_mod_inline_item` dispatcher; the plan's risk note explicitly said dispatcher wiring is not in scope.
+    [43/72] parse-type-alias-items: plan $0.72 / execute $0.80 / verified / committed 0f8b2bc
+==> plan  parse-path-types-with-generic-args
+      plan: 189.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-path-types-with-generic-args-plan-20260427T083506176.txt
+==> exec  parse-path-types-with-generic-args
+      exec: 209.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-path-types-with-generic-args-execute-20260427T083835228.txt
+      notes: - I left `parse_trait_bound` unchanged (still a single-ident bound, no generics). The plan's prose targets *types*; trait bounds will be reworked by their own todo. The stale "Stopgap" comment on `parse_trait_bound` was kept for the same reason — that bound is still single-segment and has no generic arg parsing. / - I left the `type_span` helper in `item.rs` as the plan suggested. The new `parse_type` only produces `Type::Path`, so the existing `Type::Path | Type::Ref` match still covers all reachable cases. No callers exercise the unreachable arm in tests.
