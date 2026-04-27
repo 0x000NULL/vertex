@@ -245,3 +245,9 @@
       notes: - Placed the `Pat` placeholder enum immediately after the `Stmt` placeholder (rather than between `CastTy` and `ClosureParam`) — kept it grouped with the other `// TODO: replaced by ...` placeholders, which already form a contiguous block. / - Placed `MatchArm` directly after `Match` (rather than at the end of the per-variant struct list) so the related types are co-located; it is not an `Expr` variant itself, so this does not affect dispatch.
     [38/113] add-control-flow-variants-to-expr: plan $0.29 / execute $0.46 / verified / committed bb81510
 ==> plan  define-type-enum-in-src-ast-ty-rs
+      plan: 88.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-type-enum-in-src-ast-ty-rs-plan-20260427T042618368.txt
+==> exec  define-type-enum-in-src-ast-ty-rs
+      exec: 43.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-type-enum-in-src-ast-ty-rs-execute-20260427T042701410.txt
+      notes: - No ambiguities required conservative interpretation; the plan's specs and assumptions were followed verbatim. Variant field ordering inside `Ref` matches the plan order (`mutable, ty, span, id`).
+    [39/113] define-type-enum-in-src-ast-ty-rs: plan $0.68 / execute $0.27 / verified / committed b7d6421
+==> plan  define-pattern-enum-in-src-ast-pat-rs
