@@ -210,3 +210,5 @@
 ==> plan  define-item-enum-in-src-ast-item-rs
       plan: 95.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-item-enum-in-src-ast-item-rs-plan-20260427T041407344.txt
 ==> exec  define-item-enum-in-src-ast-item-rs
+      exec: 43.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-item-enum-in-src-ast-item-rs-execute-20260427T041450390.txt
+      notes: - Plan step 4 said the `id`/`span` accessors would silence per-field `dead_code` "without needing `#[allow(dead_code)]` per field," but step 2 explicitly required `#[allow(dead_code)]` on each struct. I followed step 2 literally and placed `#[allow(dead_code)]` on every struct (and the enum, per step 3). The current `cargo build` shows zero warnings either way. / - Plan step 3 contained a self-correcting sentence about variant naming; I used the final list it specified (`Const`, `Static`, `TypeAlias`).

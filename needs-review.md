@@ -125,3 +125,25 @@ error: could not compile `vertex_stage0` (lib test) due to 1 previous error
 
 ---
 
+
+## define-stmt-enum-in-src-ast-stmt-rs
+- Item: Define `Stmt` enum in `src/ast/stmt.rs`
+- Reason: blockers
+- Timestamp: 2026-04-27T04:16:06.5377123Z
+
+### Blocker: prereq enums absent at execute time
+- severity: cross-item
+- affects: define-expr-enum-in-src-ast-expr-rs-literal-path-variants, define-type-enum-in-src-ast-ty-rs, define-pattern-enum-in-src-ast-pat-rs
+- question: Will the runner honor the Prereqs section and ensure `Expr`, `Ty`, and `Pattern` modules exist before this item executes?
+- default_assumption: If a prereq is missing at execute time, land a minimal placeholder module (e.g. `pub enum Pattern {}` in `pat.rs`, same for `expr.rs` and `ty.rs`) inline as part of this commit, so `Stmt` compiles. Accept that the dedicated prereq items may need to merge into / overwrite those placeholders later.
+- Resolution: 
+
+### Blocker: Pattern vs Pat naming
+- severity: local
+- affects: define-pattern-enum-in-src-ast-pat-rs
+- question: Is the type named `Pattern` (per the spec wording) or `Pat` (a common shorter convention also hinted at by `pat.rs`)?
+- default_assumption: Use `Pattern` since the task spec writes `pattern: Pattern` explicitly; if the prereq lands `Pat`, follow that and update the field type to `Pat`.
+- Resolution: 
+
+---
+

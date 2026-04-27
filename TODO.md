@@ -262,7 +262,7 @@
   - [ ] Variants: `Let { pattern, ty, init, span, id }`, `Expr(Expr, has_semi: bool)`, `Item(Item)`
   - [ ] **Verify:** `cargo build`; `grep -q 'pub enum Stmt' src/ast/stmt.rs`
 
-- [ ] Define `Expr` enum in `src/ast/expr.rs` — literal + path variants
+- [x] Define `Expr` enum in `src/ast/expr.rs` — literal + path variants
   - [ ] Variants: `IntLit, FloatLit, CharLit, StrLit, BoolLit, Path(Path)`
   - [ ] `Path { segments: Vec<PathSegment> }` with `PathSegment { ident, generic_args }`
   - [ ] Every variant carries `id: NodeId, span: Span`
