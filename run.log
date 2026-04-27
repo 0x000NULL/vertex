@@ -492,3 +492,18 @@
       notes: - Step 1 says "(or `&[TokenKind]` — see Assumptions)"; the Assumptions block selects `&[TokenKind]`, so I used that for both the helper and the methods. / - `format_candidate_list` is `fn` (private) rather than `pub fn`, matching the existing `describe`/`is_sync_point` privacy convention in the file.
     [24/72] expected-one-of-messages: plan $0.63 / execute $0.48 / verified / committed d027987
 ==> plan  end-to-end-recovery-test
+      plan: 180.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\end-to-end-recovery-test-plan-20260427T071020590.txt
+    [25/72] end-to-end-recovery-test: 2 cross-item, 0 local blockers -> needs-review
+        [cross-item] After diagnosing the missing initializer, should the recovered first statement be `Stmt::Let { init: None }`, `Stmt::Let { init: Some(Expr::Error(..)) }`, or skipped entirely (no statement pushed)?
+          default: Don't pin the shape. Test asserts `errors.len() == 1` plus presence of a valid `Stmt::Let` with `pattern==y` and `init==Some(IntLit(10))`, so any of those three recovery shapes passes.
+        [cross-item] Does the parse_block loop re-enter cleanly on `Let` after `recover_to_sync` consumes the trailing `;`, or does `Let` need to be added to `is_sync_point` so recovery stops *at* `let` rather than past it?
+          default: Current `recover_to_sync` stops at the `;` then consumes it, leaving `Let` as the next peek; the block loop sees `Let != RBrace/Eof` and dispatches again. No change to `is_sync_point` required from this plan; if the prereq disagrees, this test will fail loudly.
+==> plan  parse-plain-function-items
+      plan: 146.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-plain-function-items-plan-20260427T071246642.txt
+==> exec  parse-plain-function-items
+      exec: 134.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-plain-function-items-execute-20260427T071500692.txt
+      notes: - The plan's first test case (`fn id(x: i32) -> i32 { x }`) noted that path-expression parsing isn't shipped yet and authorized falling back to a literal-bodied case. I used `fn k() -> i32 { 1i32 }` per the slug's stated fallback so the test stays self-contained — it pins zero-param + return-type + tail-expression body without relying on path-expression parsing. / - `parse_type` matches `Ident` via `mem::discriminant` (passing `TokenKind::Ident(String::new())` as the kind argument to `expect`), since `expect` only compares discriminants. The bumped token's actual string is then unwrapped from its kind. Same pattern is used for the function name and parameter names.
+    [26/72] parse-plain-function-items: plan $1.20 / execute $1.19 / verified / committed 2ca5df9
+==> plan  add-modifiers-const-unsafe-extern-abi
+      plan: 56.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-modifiers-const-unsafe-extern-abi-plan-20260427T071558993.txt
+==> exec  add-modifiers-const-unsafe-extern-abi

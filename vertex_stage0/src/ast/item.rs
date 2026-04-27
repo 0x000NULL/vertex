@@ -21,6 +21,11 @@ pub struct FnDef {
     pub params: Vec<Param>,
     pub ret_ty: Option<Type>,
     pub body: Block,
+    pub is_const: bool,
+    pub is_unsafe: bool,
+    /// `None` = not `extern`. `Some(s)` = `extern` with named ABI string.
+    /// An empty string `Some(String::new())` denotes a bare `extern fn` with no ABI literal.
+    pub extern_abi: Option<String>,
 }
 
 #[allow(dead_code)]

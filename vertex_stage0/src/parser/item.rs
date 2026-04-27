@@ -1,9 +1,10 @@
 use crate::ast::expr::{Expr, Path, PathSegment};
 use crate::ast::item::{FnDef, Item, Param};
 use crate::ast::ty::Type;
-use crate::error::CompileError;
+use crate::error::{CompileError, ErrorCode, ErrorKind};
 use crate::lexer::token::TokenKind;
 use crate::parser::Parser;
+use crate::span::Span;
 
 impl Parser {
     // Stopgap: replaced by `parse-path-types-with-generic-args`.
@@ -26,8 +27,79 @@ impl Parser {
     }
 
     pub fn parse_fn(&mut self) -> Result<Item, CompileError> {
+        let mut is_const = false;
+        let mut is_unsafe = false;
+        let mut extern_abi: Option<String> = None;
+        let mut first_modifier_span: Option<Span> = None;
+
+        loop {
+            match self.peek() {
+                TokenKind::Const => {
+                    let t = self.bump();
+                    if first_modifier_span.is_none() {
+                        first_modifier_span = Some(t.span);
+                    }
+                    if is_const {
+                        let err = CompileError::new(
+                            ErrorCode::E0100,
+                            ErrorKind::Syntax,
+                            t.span,
+                            "duplicate `const` modifier on function",
+                        );
+                        self.errors.push(err);
+                    } else {
+                        is_const = true;
+                    }
+                }
+                TokenKind::Unsafe => {
+                    let t = self.bump();
+                    if first_modifier_span.is_none() {
+                        first_modifier_span = Some(t.span);
+                    }
+                    if is_unsafe {
+                        let err = CompileError::new(
+                            ErrorCode::E0100,
+                            ErrorKind::Syntax,
+                            t.span,
+                            "duplicate `unsafe` modifier on function",
+                        );
+                        self.errors.push(err);
+                    } else {
+                        is_unsafe = true;
+                    }
+                }
+                TokenKind::Extern => {
+                    let t = self.bump();
+                    if first_modifier_span.is_none() {
+                        first_modifier_span = Some(t.span);
+                    }
+                    let abi = if matches!(self.peek(), TokenKind::StringLiteral(_)) {
+                        let abi_tok = self.bump();
+                        match abi_tok.kind {
+                            TokenKind::StringLiteral(s) => s,
+                            _ => unreachable!(),
+                        }
+                    } else {
+                        String::new()
+                    };
+                    if extern_abi.is_some() {
+                        let err = CompileError::new(
+                            ErrorCode::E0100,
+                            ErrorKind::Syntax,
+                            t.span,
+                            "duplicate `extern` modifier on function",
+                        );
+                        self.errors.push(err);
+                    } else {
+                        extern_abi = Some(abi);
+                    }
+                }
+                _ => break,
+            }
+        }
+
         let fn_kw = self.expect(&TokenKind::Fn)?;
-        let fn_kw_span = fn_kw.span;
+        let start_span = first_modifier_span.unwrap_or(fn_kw.span);
 
         let name_tok = self.expect(&TokenKind::Ident(String::new()))?;
         let name = match name_tok.kind {
@@ -71,7 +143,7 @@ impl Parser {
             other => unreachable!("parse_block returned non-block: {:?}", other),
         };
 
-        let span = fn_kw_span.merge(&body.span);
+        let span = start_span.merge(&body.span);
         let id = self.new_node_id();
         Ok(Item::Fn(FnDef {
             id,
@@ -80,6 +152,9 @@ impl Parser {
             params,
             ret_ty,
             body,
+            is_const,
+            is_unsafe,
+            extern_abi,
         }))
     }
 }
@@ -216,5 +291,150 @@ mod tests {
         }
         assert!(p.errors.is_empty());
         assert!(matches!(p.peek(), TokenKind::Eof));
+    }
+
+    fn string_tok(s: &str) -> Token {
+        tok(TokenKind::StringLiteral(s.to_string()))
+    }
+
+    #[test]
+    fn fn_modifiers() {
+        // const fn f() {}
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Const),
+            tok(TokenKind::Fn),
+            ident_tok("f"),
+            tok(TokenKind::LParen),
+            tok(TokenKind::RParen),
+            tok(TokenKind::LBrace),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let f = as_fn(p.parse_fn().expect("parse_fn"));
+        assert_eq!(f.name, "f");
+        assert!(f.is_const);
+        assert!(!f.is_unsafe);
+        assert!(f.extern_abi.is_none());
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // unsafe fn g() {}
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Unsafe),
+            tok(TokenKind::Fn),
+            ident_tok("g"),
+            tok(TokenKind::LParen),
+            tok(TokenKind::RParen),
+            tok(TokenKind::LBrace),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let f = as_fn(p.parse_fn().expect("parse_fn"));
+        assert_eq!(f.name, "g");
+        assert!(!f.is_const);
+        assert!(f.is_unsafe);
+        assert!(f.extern_abi.is_none());
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // extern "C" fn h() {}
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Extern),
+            string_tok("C"),
+            tok(TokenKind::Fn),
+            ident_tok("h"),
+            tok(TokenKind::LParen),
+            tok(TokenKind::RParen),
+            tok(TokenKind::LBrace),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let f = as_fn(p.parse_fn().expect("parse_fn"));
+        assert_eq!(f.name, "h");
+        assert!(!f.is_const);
+        assert!(!f.is_unsafe);
+        assert_eq!(f.extern_abi.as_deref(), Some("C"));
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // extern fn i() {} (bare extern, no ABI literal)
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Extern),
+            tok(TokenKind::Fn),
+            ident_tok("i"),
+            tok(TokenKind::LParen),
+            tok(TokenKind::RParen),
+            tok(TokenKind::LBrace),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let f = as_fn(p.parse_fn().expect("parse_fn"));
+        assert_eq!(f.name, "i");
+        assert_eq!(f.extern_abi.as_deref(), Some(""));
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // const unsafe extern "C" fn j() {}
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Const),
+            tok(TokenKind::Unsafe),
+            tok(TokenKind::Extern),
+            string_tok("C"),
+            tok(TokenKind::Fn),
+            ident_tok("j"),
+            tok(TokenKind::LParen),
+            tok(TokenKind::RParen),
+            tok(TokenKind::LBrace),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let f = as_fn(p.parse_fn().expect("parse_fn"));
+        assert_eq!(f.name, "j");
+        assert!(f.is_const);
+        assert!(f.is_unsafe);
+        assert_eq!(f.extern_abi.as_deref(), Some("C"));
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // unsafe const fn k() {} (any-order acceptance)
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Unsafe),
+            tok(TokenKind::Const),
+            tok(TokenKind::Fn),
+            ident_tok("k"),
+            tok(TokenKind::LParen),
+            tok(TokenKind::RParen),
+            tok(TokenKind::LBrace),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let f = as_fn(p.parse_fn().expect("parse_fn"));
+        assert_eq!(f.name, "k");
+        assert!(f.is_const);
+        assert!(f.is_unsafe);
+        assert!(f.extern_abi.is_none());
+        assert!(p.errors.is_empty());
+
+        // duplicate `const` produces an E0100 error but still parses
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Const),
+            tok(TokenKind::Const),
+            tok(TokenKind::Fn),
+            ident_tok("dup"),
+            tok(TokenKind::LParen),
+            tok(TokenKind::RParen),
+            tok(TokenKind::LBrace),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let f = as_fn(p.parse_fn().expect("parse_fn"));
+        assert_eq!(f.name, "dup");
+        assert!(f.is_const);
+        assert_eq!(p.errors.len(), 1);
+        let errs = std::mem::take(&mut p.errors)
+            .into_result(())
+            .expect_err("expected accumulated error");
+        assert_eq!(errs[0].code, crate::error::ErrorCode::E0100);
+        assert_eq!(errs[0].kind, crate::error::ErrorKind::Syntax);
     }
 }

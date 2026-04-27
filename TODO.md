@@ -428,7 +428,7 @@
   - [ ] Param: `name: Type` (no patterns yet)
   - [ ] **Verify:** `cargo test --lib parser::item::tests::plain_fn`
 
-- [ ] Add modifiers: `const`, `unsafe`, `extern "ABI"`
+- [x] Add modifiers: `const`, `unsafe`, `extern "ABI"`
   - [ ] `const fn`, `unsafe fn`, `extern "C" fn`, combinations
   - [ ] **Verify:** `cargo test --lib parser::item::tests::fn_modifiers`
 
