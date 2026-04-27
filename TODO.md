@@ -348,7 +348,7 @@
   - [ ] `a..b`, `a..=b`, `a..`, `..b`, `..`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::range_forms`
 
-- [ ] Parse closure expressions
+- [x] Parse closure expressions
   - [ ] `|params| body`, `move |params| body`, `|x: i32| -> i32 { body }`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::closure_forms`
 

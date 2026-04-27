@@ -403,3 +403,5 @@
 ==> plan  parse-range-expressions
       plan: 197.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-range-expressions-plan-20260427T055946626.txt
 ==> exec  parse-range-expressions
+      exec: 94.34s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-range-expressions-execute-20260427T060120995.txt
+      notes: - Implemented `..=` symmetrically as a prefix form (no extra code cost), as the plan's Assumptions section explicitly authorized. / - Did not add a non-associative chained-range guard (`a..b..c`); the plan calls this a deferable risk and `range_forms` does not exercise it, so I left the LHS unchanged on a non-range continuation per the conservative reading.

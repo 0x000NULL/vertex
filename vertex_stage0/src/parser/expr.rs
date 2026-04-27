@@ -1,6 +1,7 @@
 use crate::ast::expr::{
-    Binary, BinaryOp, BoolLit, Call, Cast, CastTy, CharLit, Expr, FieldAccess, FloatLit, Index,
-    IntLit, MethodCall, Range, StrLit, Try, TupleFieldAccess, TupleLit, Unary, UnaryOp,
+    Binary, BinaryOp, Block, BoolLit, Call, Cast, CastTy, CharLit, Closure, ClosureParam, Expr,
+    FieldAccess, FloatLit, Index, IntLit, MethodCall, Range, StrLit, Try, TupleFieldAccess,
+    TupleLit, Unary, UnaryOp,
 };
 use crate::error::{CompileError, ErrorCode, ErrorKind};
 use crate::lexer::token::TokenKind;
@@ -145,7 +146,111 @@ impl Parser {
     }
 
     pub fn parse_expr(&mut self) -> Result<Expr, CompileError> {
+        if matches!(self.peek(), TokenKind::Pipe) {
+            return self.parse_closure();
+        }
+        if matches!(self.peek(), TokenKind::Ident(s) if s == "move")
+            && matches!(self.peek_at(1), TokenKind::Pipe)
+        {
+            return self.parse_closure();
+        }
         self.parse_range()
+    }
+
+    fn parse_closure(&mut self) -> Result<Expr, CompileError> {
+        let start_span = if self.pos < self.tokens.len() {
+            self.tokens[self.pos].span
+        } else if let Some(last) = self.tokens.last() {
+            last.span
+        } else {
+            crate::span::Span::new(crate::span::FileId(0), 0, 0)
+        };
+
+        let move_kw = if matches!(self.peek(), TokenKind::Ident(s) if s == "move") {
+            self.bump();
+            true
+        } else {
+            false
+        };
+
+        self.expect(&TokenKind::Pipe)?;
+
+        let mut params: Vec<ClosureParam> = Vec::new();
+        while !matches!(self.peek(), TokenKind::Pipe | TokenKind::Eof) {
+            let param = self.parse_closure_param()?;
+            params.push(param);
+            if matches!(self.peek(), TokenKind::Comma) {
+                self.bump();
+            } else {
+                break;
+            }
+        }
+
+        self.expect(&TokenKind::Pipe)?;
+
+        // TODO: store the parsed return type on `Closure` once a `return_ty`
+        // field exists; for now the `-> Ty` stub is consumed and discarded.
+        if matches!(self.peek(), TokenKind::Arrow) {
+            self.bump();
+            // TODO: replace when type parser lands
+            match self.peek() {
+                TokenKind::Ident(_) | TokenKind::SelfUpper => {
+                    self.bump();
+                }
+                _ => return Err(self.unexpected_token_error("type after `->`")),
+            }
+        }
+
+        let body = if matches!(self.peek(), TokenKind::LBrace) {
+            self.parse_block_stub()?
+        } else {
+            self.parse_expr()?
+        };
+
+        let span = start_span.merge(&body.span());
+        let id = self.new_node_id();
+        Ok(Expr::Closure(Closure {
+            id,
+            span,
+            params,
+            body: Box::new(body),
+            move_kw,
+        }))
+    }
+
+    fn parse_closure_param(&mut self) -> Result<ClosureParam, CompileError> {
+        match self.peek() {
+            TokenKind::Ident(_) => {
+                self.bump();
+            }
+            _ => return Err(self.unexpected_token_error("identifier")),
+        }
+        if matches!(self.peek(), TokenKind::Colon) {
+            self.bump();
+            // TODO: replace when type parser lands
+            match self.peek() {
+                TokenKind::Ident(_) | TokenKind::SelfUpper => {
+                    self.bump();
+                }
+                _ => return Err(self.unexpected_token_error("type after `:`")),
+            }
+        }
+        Ok(ClosureParam::Placeholder)
+    }
+
+    // TODO: replaced by parse-block-expressions
+    fn parse_block_stub(&mut self) -> Result<Expr, CompileError> {
+        let lbrace_tok = self.expect(&TokenKind::LBrace)?;
+        let inner = self.parse_expr()?;
+        let rbrace_tok = self.expect(&TokenKind::RBrace)?;
+        let span = lbrace_tok.span.merge(&rbrace_tok.span);
+        let id = self.new_node_id();
+        Ok(Expr::Block(Block {
+            id,
+            span,
+            stmts: Vec::new(),
+            tail: Some(Box::new(inner)),
+        }))
     }
 
     fn parse_range(&mut self) -> Result<Expr, CompileError> {
@@ -1523,6 +1628,146 @@ mod tests {
         }
         assert_eq!(p.pos, 1);
         assert!(p.errors.is_empty());
+    }
+
+    #[test]
+    fn closure_forms() {
+        // `|| 1i32` → Closure { params: [], move_kw: false, body: IntLit(1) }
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Pipe),
+            tok(TokenKind::Pipe),
+            int_tok(1),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Closure(c)) => {
+                assert!(c.params.is_empty());
+                assert!(!c.move_kw);
+                match *c.body {
+                    Expr::IntLit(lit) => assert_eq!(lit.value, 1),
+                    other => panic!("expected IntLit body, got {:?}", other),
+                }
+            }
+            other => panic!("expected Closure for `|| 1i32`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 3);
+        assert!(p.errors.is_empty());
+
+        // `|x| 1i32` → 1 param, move_kw=false
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Pipe),
+            tok(TokenKind::Ident("x".to_string())),
+            tok(TokenKind::Pipe),
+            int_tok(1),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Closure(c)) => {
+                assert_eq!(c.params.len(), 1);
+                assert!(matches!(c.params[0], ClosureParam::Placeholder));
+                assert!(!c.move_kw);
+                match *c.body {
+                    Expr::IntLit(lit) => assert_eq!(lit.value, 1),
+                    other => panic!("expected IntLit body, got {:?}", other),
+                }
+            }
+            other => panic!("expected Closure for `|x| 1i32`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 4);
+        assert!(p.errors.is_empty());
+
+        // `move || 1i32` → move_kw=true, no params
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Ident("move".to_string())),
+            tok(TokenKind::Pipe),
+            tok(TokenKind::Pipe),
+            int_tok(1),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Closure(c)) => {
+                assert!(c.move_kw);
+                assert!(c.params.is_empty());
+                match *c.body {
+                    Expr::IntLit(lit) => assert_eq!(lit.value, 1),
+                    other => panic!("expected IntLit body, got {:?}", other),
+                }
+            }
+            other => panic!("expected Closure for `move || 1i32`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 4);
+        assert!(p.errors.is_empty());
+
+        // `|x: i32| 1i32` → 1 param with type-stub consumed
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Pipe),
+            tok(TokenKind::Ident("x".to_string())),
+            tok(TokenKind::Colon),
+            tok(TokenKind::Ident("i32".to_string())),
+            tok(TokenKind::Pipe),
+            int_tok(1),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Closure(c)) => {
+                assert_eq!(c.params.len(), 1);
+                assert!(matches!(c.params[0], ClosureParam::Placeholder));
+                assert!(!c.move_kw);
+                match *c.body {
+                    Expr::IntLit(lit) => assert_eq!(lit.value, 1),
+                    other => panic!("expected IntLit body, got {:?}", other),
+                }
+            }
+            other => panic!("expected Closure for `|x: i32| 1i32`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 6);
+        assert!(p.errors.is_empty());
+
+        // `|x: i32| -> i32 { 1i32 }` → block body, return-type stub consumed
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Pipe),
+            tok(TokenKind::Ident("x".to_string())),
+            tok(TokenKind::Colon),
+            tok(TokenKind::Ident("i32".to_string())),
+            tok(TokenKind::Pipe),
+            tok(TokenKind::Arrow),
+            tok(TokenKind::Ident("i32".to_string())),
+            tok(TokenKind::LBrace),
+            int_tok(1),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Closure(c)) => {
+                assert_eq!(c.params.len(), 1);
+                assert!(!c.move_kw);
+                match *c.body {
+                    Expr::Block(b) => {
+                        assert!(b.stmts.is_empty());
+                        let tail = b.tail.expect("tail");
+                        match *tail {
+                            Expr::IntLit(lit) => assert_eq!(lit.value, 1),
+                            other => panic!("expected IntLit tail, got {:?}", other),
+                        }
+                    }
+                    other => panic!("expected Block body, got {:?}", other),
+                }
+            }
+            other => panic!("expected Closure with Block body, got {:?}", other),
+        }
+        assert_eq!(p.pos, 10);
+        assert!(p.errors.is_empty());
+
+        // negative: `| 1i32` (missing closing `|`) → Err(E0100)
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Pipe),
+            int_tok(1),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Err(e) => assert_eq!(e.code, ErrorCode::E0100),
+            Ok(other) => panic!("expected Err(E0100) for `| 1i32`, got Ok({:?})", other),
+        }
     }
 
     #[test]
