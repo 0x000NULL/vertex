@@ -194,3 +194,13 @@
 ==> exec  add-30-snapshot-tests-for-spec-2-examples
       exec: 173.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-30-snapshot-tests-for-spec-2-examples-execute-20260427T040853526.txt
       notes: - Used `use crate::lex_eq;` inside the new module to bring the `#[macro_export]`ed macro into scope explicitly — this is the conservative path the plan's Risks section called out. / - For `vec![1, 2, 3]` and `#[derive(Clone)]`, kept the literal `!`/`#` characters and asserted the current scanner's `Error("invalid character: !")`/`Error("invalid character: #")` output, per the plan's stated approach of snapshotting reality.
+    [30/113] add-30-snapshot-tests-for-spec-2-examples: plan $0.53 / execute $1.17 / verified / committed 3ef8cf7
+==> plan  define-nodeid-newtype-in-src-ast-mod-rs
+      plan: 42.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-nodeid-newtype-in-src-ast-mod-rs-plan-20260427T040936416.txt
+==> exec  define-nodeid-newtype-in-src-ast-mod-rs
+      exec: 60.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-nodeid-newtype-in-src-ast-mod-rs-execute-20260427T041036470.txt
+      notes: - The plan's Step 2 contained contradictory ordering guidance ("alphabetically between `error` and `explain`... actually between `ast` and `codegen`"). I picked the second, self-corrected interpretation (before `codegen`), which is also alphabetically correct. / - Wrote no doc comments, no `impl` block, no `Ord`/`PartialOrd`/`Default` derives — exactly the minimal set the plan specified.
+    [31/113] define-nodeid-newtype-in-src-ast-mod-rs: plan $0.28 / execute $0.34 / verified / committed cbf2314
+==> plan  wire-arena-allocator-into-ast
+      plan: 74.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\wire-arena-allocator-into-ast-plan-20260427T041151269.txt
+==> exec  wire-arena-allocator-into-ast

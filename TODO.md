@@ -247,7 +247,7 @@
   - [ ] `pub struct NodeId(pub u32);` with `Copy, Clone, PartialEq, Eq, Hash, Debug`
   - [ ] **Verify:** `cargo build`; `grep -q 'pub struct NodeId' src/ast/mod.rs`
 
-- [ ] Wire arena allocator into AST
+- [x] Wire arena allocator into AST
   - [ ] Add `typed-arena = "2"` to `Cargo.toml`
   - [ ] Define `pub struct Arena { ... }` wrapping per-node-type arenas
   - [ ] **Verify:** `cargo build`; `grep -q '^typed-arena' Cargo.toml`

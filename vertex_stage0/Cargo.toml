@@ -13,3 +13,6 @@ path = "src/main.rs"
 [[test]]
 name = "smoke"
 path = "tests/integration/smoke.rs"
+
+[dependencies]
+typed-arena = "2"
