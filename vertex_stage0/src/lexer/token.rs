@@ -1,4 +1,26 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum IntSuffix {
+    I8,
+    I16,
+    I32,
+    I64,
+    ISize,
+    U8,
+    U16,
+    U32,
+    U64,
+    USize,
+    Unsuffixed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FloatSuffix {
+    F32,
+    F64,
+    Unsuffixed,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
     Break,
     Const,
@@ -32,4 +54,9 @@ pub enum TokenKind {
     Where,
     While,
     And,
+    IntLiteral(u64, IntSuffix),
+    FloatLiteral(f64, FloatSuffix),
+    CharLiteral(char),
+    StringLiteral(String),
+    RawStringLiteral(String),
 }

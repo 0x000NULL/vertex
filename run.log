@@ -60,3 +60,5 @@
 ==> plan  define-tokenkind-enum-in-src-lexer-token-rs-keyword-variants
       plan: 76.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-tokenkind-enum-in-src-lexer-token-rs-keyword-variants-plan-20260427T030605988.txt
 ==> exec  define-tokenkind-enum-in-src-lexer-token-rs-keyword-variants
+      exec: 73.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-tokenkind-enum-in-src-lexer-token-rs-keyword-variants-execute-20260427T030719042.txt
+      notes: - Used the literal 32-variant list from the plan verbatim (ignoring the prose's "29 keyword variants" count, as the plan instructed). / - Variant order in the file follows the plan's listed order exactly.

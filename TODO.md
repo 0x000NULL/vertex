@@ -121,7 +121,7 @@
   - [ ] 29 keyword variants: `Break, Const, Continue, Else, Enum, Extern, False, Fn, For, If, Impl, In, Let, Loop, Match, Mod, Mut, Not, Or, Pub, Return, SelfLower, SelfUpper, Struct, Trait, True, Type, Unsafe, Use, Where, While, And` (matches §2 of spec)
   - [ ] **Verify:** `cargo build`; `grep -q 'pub enum TokenKind' src/lexer/token.rs`
 
-- [ ] Add literal variants to `TokenKind`
+- [x] Add literal variants to `TokenKind`
   - [ ] `IntLiteral(u64, IntSuffix)`, `FloatLiteral(f64, FloatSuffix)`, `CharLiteral(char)`, `StringLiteral(String)`, `RawStringLiteral(String)`
   - [ ] Define `IntSuffix` and `FloatSuffix` enums in same file (variants: `I8..I64, ISize, U8..U64, USize, Unsuffixed` and `F32, F64, Unsuffixed`)
   - [ ] **Verify:** `cargo build`; `grep -q 'IntLiteral' src/lexer/token.rs`
