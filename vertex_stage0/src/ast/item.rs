@@ -1,5 +1,5 @@
 use crate::ast::expr::{Block, Expr};
-use crate::ast::generics::Generics;
+use crate::ast::generics::{Generics, TraitBound};
 use crate::ast::ty::Type;
 use crate::ast::NodeId;
 use crate::span::Span;
@@ -100,6 +100,47 @@ pub struct ImplDef {
 pub struct TraitDef {
     pub id: NodeId,
     pub span: Span,
+    pub name: String,
+    pub generics: Option<Generics>,
+    pub supertraits: Vec<TraitBound>,
+    pub items: Vec<TraitItem>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub enum TraitItem {
+    Fn(TraitItemFn),
+    Type(TraitItemType),
+    Const(TraitItemConst),
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct TraitItemFn {
+    pub id: NodeId,
+    pub span: Span,
+    pub name: String,
+    pub generics: Option<Generics>,
+    pub params: Vec<Param>,
+    pub ret_ty: Option<Type>,
+    pub default: Option<Block>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct TraitItemType {
+    pub id: NodeId,
+    pub span: Span,
+    pub name: String,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct TraitItemConst {
+    pub id: NodeId,
+    pub span: Span,
+    pub name: String,
+    pub ty: Type,
 }
 
 #[allow(dead_code)]

@@ -1,7 +1,8 @@
 use crate::ast::expr::{Expr, GenericArg, IntLit, Path, PathSegment};
 use crate::ast::generics::{Generics, TraitBound, TypeParam, WhereClause, WherePred};
 use crate::ast::item::{
-    EnumDef, EnumVariant, Field, FnDef, Item, Param, StructDef, StructKind, VariantKind,
+    EnumDef, EnumVariant, Field, FnDef, Item, Param, StructDef, StructKind, TraitDef, TraitItem,
+    TraitItemConst, TraitItemFn, TraitItemType, VariantKind,
 };
 use crate::ast::ty::Type;
 use crate::error::{CompileError, ErrorCode, ErrorKind};
@@ -268,6 +269,59 @@ impl Parser {
         })
     }
 
+    fn parse_fn_signature_tail(
+        &mut self,
+    ) -> Result<(Vec<Param>, Option<Type>, Option<WhereClause>), CompileError> {
+        self.expect(&TokenKind::LParen)?;
+        let mut params: Vec<Param> = Vec::new();
+        let mut had_self = false;
+        if let Some(self_param) = self.try_parse_self_param() {
+            params.push(self_param?);
+            had_self = true;
+        }
+        let mut continue_params = true;
+        if had_self {
+            continue_params = self.eat(&TokenKind::Comma);
+        }
+        while continue_params && !matches!(self.peek(), TokenKind::RParen) {
+            let pname_tok = self.expect(&TokenKind::Ident(String::new()))?;
+            let pname_span = pname_tok.span;
+            let pname = match pname_tok.kind {
+                TokenKind::Ident(s) => s,
+                _ => unreachable!(),
+            };
+            self.expect(&TokenKind::Colon)?;
+            let pty = self.parse_type()?;
+            let pspan = pname_span.merge(&type_span(&pty));
+            let pid = self.new_node_id();
+            params.push(Param {
+                id: pid,
+                span: pspan,
+                name: pname,
+                ty: pty,
+                is_self: false,
+            });
+            if !self.eat(&TokenKind::Comma) {
+                break;
+            }
+        }
+        self.expect(&TokenKind::RParen)?;
+
+        let ret_ty = if self.eat(&TokenKind::Arrow) {
+            Some(self.parse_type()?)
+        } else {
+            None
+        };
+
+        let where_clause = if matches!(self.peek(), TokenKind::Where) {
+            Some(self.parse_where_clause()?)
+        } else {
+            None
+        };
+
+        Ok((params, ret_ty, where_clause))
+    }
+
     pub fn parse_fn(&mut self) -> Result<Item, CompileError> {
         let mut is_const = false;
         let mut is_unsafe = false;
@@ -358,52 +412,7 @@ impl Parser {
             generics_list_span = Some(lt_span.merge(&gt_span));
         }
 
-        self.expect(&TokenKind::LParen)?;
-        let mut params: Vec<Param> = Vec::new();
-        let mut had_self = false;
-        if let Some(self_param) = self.try_parse_self_param() {
-            params.push(self_param?);
-            had_self = true;
-        }
-        let mut continue_params = true;
-        if had_self {
-            continue_params = self.eat(&TokenKind::Comma);
-        }
-        while continue_params && !matches!(self.peek(), TokenKind::RParen) {
-            let pname_tok = self.expect(&TokenKind::Ident(String::new()))?;
-            let pname_span = pname_tok.span;
-            let pname = match pname_tok.kind {
-                TokenKind::Ident(s) => s,
-                _ => unreachable!(),
-            };
-            self.expect(&TokenKind::Colon)?;
-            let pty = self.parse_type()?;
-            let pspan = pname_span.merge(&type_span(&pty));
-            let pid = self.new_node_id();
-            params.push(Param {
-                id: pid,
-                span: pspan,
-                name: pname,
-                ty: pty,
-                is_self: false,
-            });
-            if !self.eat(&TokenKind::Comma) {
-                break;
-            }
-        }
-        self.expect(&TokenKind::RParen)?;
-
-        let ret_ty = if self.eat(&TokenKind::Arrow) {
-            Some(self.parse_type()?)
-        } else {
-            None
-        };
-
-        let where_clause = if matches!(self.peek(), TokenKind::Where) {
-            Some(self.parse_where_clause()?)
-        } else {
-            None
-        };
+        let (params, ret_ty, where_clause) = self.parse_fn_signature_tail()?;
 
         let body = match self.parse_block()? {
             Expr::Block(b) => b,
@@ -701,6 +710,199 @@ impl Parser {
             name,
             generics,
             variants,
+        }))
+    }
+
+    pub fn parse_trait(&mut self) -> Result<Item, CompileError> {
+        let trait_kw = self.expect(&TokenKind::Trait)?;
+        let start_span = trait_kw.span;
+
+        let name_tok = self.expect(&TokenKind::Ident(String::new()))?;
+        let name = match name_tok.kind {
+            TokenKind::Ident(s) => s,
+            _ => unreachable!(),
+        };
+
+        let mut generic_params: Vec<TypeParam> = Vec::new();
+        let mut generics_list_span: Option<Span> = None;
+        if matches!(self.peek(), TokenKind::Lt) {
+            let lt_span = self.tokens[self.pos].span;
+            let (params, gt_span) = self.parse_generics_params()?;
+            generic_params = params;
+            generics_list_span = Some(lt_span.merge(&gt_span));
+        }
+
+        // Stopgap: supertraits go through `parse_bounds`, which still accepts
+        // bare-ident bounds only. Replaced by `parse-path-types-with-generic-args`.
+        let supertraits = if self.eat(&TokenKind::Colon) {
+            self.parse_bounds()?
+        } else {
+            Vec::new()
+        };
+
+        let where_clause = if matches!(self.peek(), TokenKind::Where) {
+            Some(self.parse_where_clause()?)
+        } else {
+            None
+        };
+
+        self.expect(&TokenKind::LBrace)?;
+        let mut items: Vec<TraitItem> = Vec::new();
+        loop {
+            match self.peek() {
+                TokenKind::RBrace => break,
+                TokenKind::Fn => {
+                    items.push(self.parse_trait_method()?);
+                }
+                TokenKind::Type => {
+                    let type_kw = self.bump();
+                    let type_span = type_kw.span;
+                    let ident_tok = self.expect(&TokenKind::Ident(String::new()))?;
+                    let ident = match ident_tok.kind {
+                        TokenKind::Ident(s) => s,
+                        _ => unreachable!(),
+                    };
+                    let semi_tok = self.expect(&TokenKind::Semi)?;
+                    let span = type_span.merge(&semi_tok.span);
+                    let id = self.new_node_id();
+                    items.push(TraitItem::Type(TraitItemType {
+                        id,
+                        span,
+                        name: ident,
+                    }));
+                }
+                TokenKind::Const => {
+                    let const_kw = self.bump();
+                    let const_span = const_kw.span;
+                    let ident_tok = self.expect(&TokenKind::Ident(String::new()))?;
+                    let ident = match ident_tok.kind {
+                        TokenKind::Ident(s) => s,
+                        _ => unreachable!(),
+                    };
+                    self.expect(&TokenKind::Colon)?;
+                    let ty = self.parse_type()?;
+                    let semi_tok = self.expect(&TokenKind::Semi)?;
+                    let span = const_span.merge(&semi_tok.span);
+                    let id = self.new_node_id();
+                    items.push(TraitItem::Const(TraitItemConst {
+                        id,
+                        span,
+                        name: ident,
+                        ty,
+                    }));
+                }
+                _ => {
+                    self.expected_one_of_error(&[
+                        TokenKind::Fn,
+                        TokenKind::Type,
+                        TokenKind::Const,
+                        TokenKind::RBrace,
+                    ]);
+                    break;
+                }
+            }
+        }
+        let rbrace_tok = self.expect(&TokenKind::RBrace)?;
+        let end_span = rbrace_tok.span;
+
+        let generics = if generics_list_span.is_some() || where_clause.is_some() {
+            let span = match (generics_list_span, where_clause.as_ref()) {
+                (Some(a), Some(w)) => a.merge(&w.span),
+                (Some(a), None) => a,
+                (None, Some(w)) => w.span,
+                (None, None) => unreachable!(),
+            };
+            let id = self.new_node_id();
+            Some(Generics {
+                id,
+                span,
+                params: generic_params,
+                where_clause,
+            })
+        } else {
+            None
+        };
+
+        let span = start_span.merge(&end_span);
+        let id = self.new_node_id();
+        Ok(Item::Trait(TraitDef {
+            id,
+            span,
+            name,
+            generics,
+            supertraits,
+            items,
+        }))
+    }
+
+    fn parse_trait_method(&mut self) -> Result<TraitItem, CompileError> {
+        let fn_kw = self.expect(&TokenKind::Fn)?;
+        let start_span = fn_kw.span;
+
+        let name_tok = self.expect(&TokenKind::Ident(String::new()))?;
+        let name = match name_tok.kind {
+            TokenKind::Ident(s) => s,
+            _ => unreachable!(),
+        };
+
+        let mut generic_params: Vec<TypeParam> = Vec::new();
+        let mut generics_list_span: Option<Span> = None;
+        if matches!(self.peek(), TokenKind::Lt) {
+            let lt_span = self.tokens[self.pos].span;
+            let (params, gt_span) = self.parse_generics_params()?;
+            generic_params = params;
+            generics_list_span = Some(lt_span.merge(&gt_span));
+        }
+
+        let (params, ret_ty, where_clause) = self.parse_fn_signature_tail()?;
+
+        let (default, end_span) = match self.peek() {
+            TokenKind::Semi => {
+                let semi_tok = self.bump();
+                (None, semi_tok.span)
+            }
+            TokenKind::LBrace => {
+                let block = match self.parse_block()? {
+                    Expr::Block(b) => b,
+                    other => unreachable!("parse_block returned non-block: {:?}", other),
+                };
+                let block_span = block.span;
+                (Some(block), block_span)
+            }
+            _ => {
+                let _ = self.expect_one_of(&[TokenKind::Semi, TokenKind::LBrace])?;
+                unreachable!();
+            }
+        };
+
+        let generics = if generics_list_span.is_some() || where_clause.is_some() {
+            let span = match (generics_list_span, where_clause.as_ref()) {
+                (Some(a), Some(w)) => a.merge(&w.span),
+                (Some(a), None) => a,
+                (None, Some(w)) => w.span,
+                (None, None) => unreachable!(),
+            };
+            let id = self.new_node_id();
+            Some(Generics {
+                id,
+                span,
+                params: generic_params,
+                where_clause,
+            })
+        } else {
+            None
+        };
+
+        let span = start_span.merge(&end_span);
+        let id = self.new_node_id();
+        Ok(TraitItem::Fn(TraitItemFn {
+            id,
+            span,
+            name,
+            generics,
+            params,
+            ret_ty,
+            default,
         }))
     }
 }
@@ -1467,6 +1669,102 @@ mod tests {
             other => panic!("expected VariantKind::Tuple, got {:?}", other),
         }
         assert!(e.variants[1].discriminant.is_none());
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+    }
+
+    fn as_trait(item: Item) -> TraitDef {
+        match item {
+            Item::Trait(t) => t,
+            other => panic!("expected Item::Trait, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn trait_with_assoc() {
+        // trait Name<T>: Super + Super2 {
+        //     fn req(&self);
+        //     fn def(&self) { }
+        //     type Item;
+        //     const MAX: usize;
+        // }
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Trait),
+            ident_tok("Name"),
+            tok(TokenKind::Lt),
+            ident_tok("T"),
+            tok(TokenKind::Gt),
+            tok(TokenKind::Colon),
+            ident_tok("Super"),
+            tok(TokenKind::Plus),
+            ident_tok("Super2"),
+            tok(TokenKind::LBrace),
+            tok(TokenKind::Fn),
+            ident_tok("req"),
+            tok(TokenKind::LParen),
+            tok(TokenKind::Amp),
+            tok(TokenKind::SelfLower),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Semi),
+            tok(TokenKind::Fn),
+            ident_tok("def"),
+            tok(TokenKind::LParen),
+            tok(TokenKind::Amp),
+            tok(TokenKind::SelfLower),
+            tok(TokenKind::RParen),
+            tok(TokenKind::LBrace),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Type),
+            ident_tok("Item"),
+            tok(TokenKind::Semi),
+            tok(TokenKind::Const),
+            ident_tok("MAX"),
+            tok(TokenKind::Colon),
+            ident_tok("usize"),
+            tok(TokenKind::Semi),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let t = as_trait(p.parse_trait().expect("parse_trait"));
+        assert_eq!(t.name, "Name");
+        let generics = t.generics.as_ref().expect("generics");
+        assert_eq!(generics.params.len(), 1);
+        assert_eq!(generics.params[0].name, "T");
+        assert!(generics.params[0].bounds.is_empty());
+        assert!(generics.where_clause.is_none());
+        assert_eq!(t.supertraits.len(), 2);
+        assert_eq!(t.supertraits[0].path.segments.len(), 1);
+        assert_eq!(t.supertraits[0].path.segments[0].ident, "Super");
+        assert_eq!(t.supertraits[1].path.segments.len(), 1);
+        assert_eq!(t.supertraits[1].path.segments[0].ident, "Super2");
+        assert_eq!(t.items.len(), 4);
+        match &t.items[0] {
+            TraitItem::Fn(f) => {
+                assert_eq!(f.name, "req");
+                assert!(f.default.is_none());
+            }
+            other => panic!("expected TraitItem::Fn, got {:?}", other),
+        }
+        match &t.items[1] {
+            TraitItem::Fn(f) => {
+                assert_eq!(f.name, "def");
+                assert!(f.default.is_some());
+            }
+            other => panic!("expected TraitItem::Fn, got {:?}", other),
+        }
+        match &t.items[2] {
+            TraitItem::Type(ty) => {
+                assert_eq!(ty.name, "Item");
+            }
+            other => panic!("expected TraitItem::Type, got {:?}", other),
+        }
+        match &t.items[3] {
+            TraitItem::Const(c) => {
+                assert_eq!(c.name, "MAX");
+                assert_eq!(type_ident(&c.ty), "usize");
+            }
+            other => panic!("expected TraitItem::Const, got {:?}", other),
+        }
         assert!(p.errors.is_empty());
         assert!(matches!(p.peek(), TokenKind::Eof));
     }

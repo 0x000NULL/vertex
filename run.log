@@ -555,3 +555,9 @@
         [local] Should `parse_struct` also consume non-`repr` attributes (silently dropping them) so it can survive code with mixed attributes, or should it bail/error on any non-`repr` attribute?
           default: Silently consume any leading `#[Ident(Ident)]` attribute, only mirroring the value when the outer ident is `repr`. This keeps the parser tolerant and avoids tripping on `#[derive(...)]` etc. that other items will later add proper handling for.
 ==> plan  parse-enum-items-with-all-variant-kinds
+      plan: 99.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-enum-items-with-all-variant-kinds-plan-20260427T075302406.txt
+==> exec  parse-enum-items-with-all-variant-kinds
+      exec: 172.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-enum-items-with-all-variant-kinds-execute-20260427T075554434.txt
+      notes: - For the discriminant `IntLiteral` token, used `TokenKind::IntLiteral(0, IntSuffix::Unsuffixed)` as the discriminant placeholder for `expect()` (`expect` matches by `mem::discriminant`, so the placeholder values are irrelevant). This required adding `IntSuffix` to the parser/item.rs imports — a small extension over the plan's listed imports but necessary to instantiate the `TokenKind::IntLiteral` placeholder. / - Took the plan literally that `parse_enum` should match `parse_struct`'s pattern of building `Generics` only when `generics_list_span` is `Some(_)` (since enum has no `where` clause). Implemented as a single `.map()` instead of an explicit match — semantically equivalent.
+    [35/72] parse-enum-items-with-all-variant-kinds: plan $0.66 / execute $1.71 / verified / committed b3b637a
+==> plan  parse-trait-items

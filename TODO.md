@@ -471,7 +471,7 @@
   - [ ] Generic enums `enum Result<T, E> { Ok(T), Err(E) }`
   - [ ] **Verify:** `cargo test --lib parser::item::tests::enum_all_variant_kinds`
 
-- [ ] Parse trait items
+- [x] Parse trait items
   - [ ] `trait Name<T>: Super + Super2 { fn method(&self); type Item; const MAX: usize; }`
   - [ ] Default method bodies allowed
   - [ ] **Verify:** `cargo test --lib parser::item::tests::trait_with_assoc`
