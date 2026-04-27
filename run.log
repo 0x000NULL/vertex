@@ -68,3 +68,9 @@
 ==> exec  add-literal-variants-to-tokenkind
       exec: 26.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-literal-variants-to-tokenkind-execute-20260427T030830894.txt
       notes: - Placed `IntSuffix` and `FloatSuffix` above `TokenKind` in the file so the literal variants can reference them without a forward declaration concern (Rust allows it either way; ordering is purely stylistic, and top-down reading was the conservative choice).
+    [9/113] add-literal-variants-to-tokenkind: plan $0.27 / execute $0.21 / verified / committed 332798c
+==> plan  add-identifier-and-operator-variants-to-tokenkind
+      plan: 36.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-identifier-and-operator-variants-to-tokenkind-plan-20260427T030907894.txt
+==> exec  add-identifier-and-operator-variants-to-tokenkind
+      exec: 24.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-identifier-and-operator-variants-to-tokenkind-execute-20260427T030931939.txt
+      notes: - Appended new variants strictly after the existing literal variants in the order specified by the plan (Ident → operators → punctuation → specials), preserving the existing `#[derive(Debug, Clone, PartialEq)]` and not touching `IntSuffix`/`FloatSuffix`. / - No other items were added; no existing variants were re-ordered or renamed.

@@ -1,3 +1,5 @@
+use crate::span::Span;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum IntSuffix {
     I8,
@@ -102,4 +104,16 @@ pub enum TokenKind {
     Underscore,
     Eof,
     Error(String),
+}
+
+#[derive(Debug, Clone)]
+pub struct Token {
+    pub kind: TokenKind,
+    pub span: Span,
+}
+
+impl Token {
+    pub fn new(kind: TokenKind, span: Span) -> Self {
+        Token { kind, span }
+    }
 }

@@ -133,7 +133,7 @@
   - [ ] Special: `Eof`, `Error(String)`
   - [ ] **Verify:** `cargo build`
 
-- [ ] Define `Token` struct
+- [x] Define `Token` struct
   - [ ] Fields: `kind: TokenKind`, `span: Span`
   - [ ] **Verify:** `cargo build`; `grep -q 'pub struct Token' src/lexer/token.rs`
 
