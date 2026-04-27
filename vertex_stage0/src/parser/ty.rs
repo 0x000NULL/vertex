@@ -3,7 +3,7 @@ use crate::ast::ty::Type;
 use crate::error::{CompileError, ErrorCode, ErrorKind};
 use crate::lexer::token::TokenKind;
 use crate::parser::Parser;
-use crate::span::Span;
+use crate::span::{FileId, Span};
 
 impl Parser {
     pub fn parse_type(&mut self) -> Result<Type, CompileError> {
@@ -15,6 +15,9 @@ impl Parser {
         }
         if matches!(self.peek(), TokenKind::LBracket) {
             return self.parse_bracketed_type();
+        }
+        if matches!(self.peek(), TokenKind::LParen) {
+            return self.parse_tuple_or_grouped_type();
         }
         // Stopgap path-type body: replaced by `parse-path-types-with-generic-args`.
         let ident_tok = self.expect(&TokenKind::Ident(String::new()))?;
@@ -85,6 +88,40 @@ impl Parser {
         })
     }
 
+    fn parse_tuple_or_grouped_type(&mut self) -> Result<Type, CompileError> {
+        debug_assert!(matches!(self.peek(), TokenKind::LParen));
+        self.bump();
+
+        if matches!(self.peek(), TokenKind::RParen) {
+            self.bump();
+            return Ok(Type::Tuple(Vec::new()));
+        }
+
+        let first = self.parse_type()?;
+
+        if matches!(self.peek(), TokenKind::RParen) {
+            self.bump();
+            return Ok(first);
+        }
+
+        self.expect(&TokenKind::Comma)?;
+
+        let mut elems = vec![first];
+        loop {
+            if matches!(self.peek(), TokenKind::RParen) {
+                break;
+            }
+            elems.push(self.parse_type()?);
+            if matches!(self.peek(), TokenKind::Comma) {
+                self.bump();
+                continue;
+            }
+            break;
+        }
+        self.expect(&TokenKind::RParen)?;
+        Ok(Type::Tuple(elems))
+    }
+
     fn parse_ref_type(&mut self) -> Result<Type, CompileError> {
         debug_assert!(matches!(self.peek(), TokenKind::Amp));
         let amp_tok = self.bump();
@@ -121,6 +158,13 @@ fn type_span(ty: &Type) -> Span {
         Type::Ptr { ty, .. } => type_span(ty),
         Type::Array { elem, .. } => type_span(elem),
         Type::Slice { elem } => type_span(elem),
+        Type::Tuple(elems) => {
+            if let Some(first) = elems.first() {
+                type_span(first)
+            } else {
+                Span::new(FileId(0), 0, 0)
+            }
+        }
         _ => unreachable!("type_span: unexpected variant from stopgap parse_type"),
     }
 }
@@ -336,6 +380,61 @@ mod tests {
             }
             other => panic!("expected Type::Array, got {:?}", other),
         }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+    }
+
+    #[test]
+    fn tuple_types() {
+        // ()
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LParen),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Eof),
+        ]);
+        let ty = p.parse_type().expect("parse_type ()");
+        match ty {
+            Type::Tuple(elems) => {
+                assert!(elems.is_empty(), "expected empty tuple");
+            }
+            other => panic!("expected Type::Tuple, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // (i32, u8, bool)
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LParen),
+            ident_tok("i32"),
+            tok(TokenKind::Comma),
+            ident_tok("u8"),
+            tok(TokenKind::Comma),
+            ident_tok("bool"),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Eof),
+        ]);
+        let ty = p.parse_type().expect("parse_type (i32, u8, bool)");
+        match ty {
+            Type::Tuple(elems) => {
+                assert_eq!(elems.len(), 3);
+                assert_path_ident(&elems[0], "i32");
+                assert_path_ident(&elems[1], "u8");
+                assert_path_ident(&elems[2], "bool");
+            }
+            other => panic!("expected Type::Tuple, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // (i32) -- grouping, not a tuple
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LParen),
+            ident_tok("i32"),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Eof),
+        ]);
+        let ty = p.parse_type().expect("parse_type (i32)");
+        assert_path_ident(&ty, "i32");
         assert!(p.errors.is_empty());
         assert!(matches!(p.peek(), TokenKind::Eof));
     }

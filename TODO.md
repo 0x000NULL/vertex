@@ -534,7 +534,7 @@
   - [ ] `&[T]`, `[T; N]` (where `N` is a const expr)
   - [ ] **Verify:** `cargo test --lib parser::ty::tests::slice_and_array_types`
 
-- [ ] Parse tuple types
+- [x] Parse tuple types
   - [ ] `(T, U, V)`, `()` (unit)
   - [ ] **Verify:** `cargo test --lib parser::ty::tests::tuple_types`
 
