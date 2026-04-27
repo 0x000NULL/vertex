@@ -243,7 +243,7 @@
 
 ## 7. AST node taxonomy
 
-- [ ] Define `NodeId` newtype in `src/ast/mod.rs`
+- [x] Define `NodeId` newtype in `src/ast/mod.rs`
   - [ ] `pub struct NodeId(pub u32);` with `Copy, Clone, PartialEq, Eq, Hash, Debug`
   - [ ] **Verify:** `cargo build`; `grep -q 'pub struct NodeId' src/ast/mod.rs`
 

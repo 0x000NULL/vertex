@@ -190,3 +190,7 @@
       notes: - Used `vec![TokenKind::Let, TokenKind::Ident("x".into())]` (a `Vec<TokenKind>`) as the expected value in the self-test. The macro asserts `kinds == $expected`; since `kinds` is `Vec<TokenKind>`, supplying a `Vec` is the most conservative choice that exercises `PartialEq` exactly as the plan describes (slices/arrays would not directly satisfy `PartialEq<Vec>` without coercion). / - Annotated the macro with a single `//` line comment describing intent (drops spans, excludes trailing `Eof`), per the plan's "documented in a one-line `//` comment on the macro" assumption.
     [29/113] snapshot-test-helper-macro-in-src-lexer-test-util-rs: plan $0.36 / execute $0.45 / verified / committed 55852e5
 ==> plan  add-30-snapshot-tests-for-spec-2-examples
+      plan: 107.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-30-snapshot-tests-for-spec-2-examples-plan-20260427T040600482.txt
+==> exec  add-30-snapshot-tests-for-spec-2-examples
+      exec: 173.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-30-snapshot-tests-for-spec-2-examples-execute-20260427T040853526.txt
+      notes: - Used `use crate::lex_eq;` inside the new module to bring the `#[macro_export]`ed macro into scope explicitly — this is the conservative path the plan's Risks section called out. / - For `vec![1, 2, 3]` and `#[derive(Clone)]`, kept the literal `!`/`#` characters and asserted the current scanner's `Error("invalid character: !")`/`Error("invalid character: #")` output, per the plan's stated approach of snapshotting reality.
