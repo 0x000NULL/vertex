@@ -150,3 +150,7 @@
 ==> plan  wire-all-scanners-into-scanner-next-token-driver
       plan: 86.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\wire-all-scanners-into-scanner-next-token-driver-plan-20260427T034314567.txt
 ==> exec  wire-all-scanners-into-scanner-next-token-driver
+      exec: 261.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\wire-all-scanners-into-scanner-next-token-driver-execute-20260427T034735629.txt
+      notes: - For the inter-token-gap span check, my first attempt (per-byte: whitespace OR `/`/`*`) was too strict — it rejected the inner content of `// line comment`. I replaced it with a fresh `Scanner::skip_whitespace_and_comments` over the gap, asserting the scanner consumes the whole gap. This satisfies the plan's "contiguous-or-separated-only-by-whitespace/comments" intent more faithfully than a byte whitelist would. / - I imported `Token` at the top of `scan.rs` (`use crate::lexer::token::Token;`) since `next_token` constructs `Token::new(...)`. The plan didn't mention this import explicitly but it's required by step 2.
+    [23/113] wire-all-scanners-into-scanner-next-token-driver: plan $0.51 / execute $1.47 / verified / committed 8a5137a
+==> plan  verify-every-token-carries-a-span

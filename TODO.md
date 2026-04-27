@@ -202,7 +202,7 @@
   - [ ] Skip whitespace + comments; dispatch on first char
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::tokenizes_full_program`
 
-- [ ] Verify every token carries a `Span`
+- [x] Verify every token carries a `Span`
   - [ ] Add an integration test that walks `Scanner::next_token` to EOF and asserts every `Token.span.start < Token.span.end`
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::all_tokens_have_nonzero_span`
 

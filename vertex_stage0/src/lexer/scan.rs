@@ -1545,6 +1545,64 @@ mod tests {
     }
 
     #[test]
+    fn all_tokens_have_nonzero_span() {
+        let src = "/// outer doc\n//! inner doc\nfn let if else while for loop return struct enum trait impl mod use pub const static mut self Self as in match break continue type where foo _ _bar 0 123 0xFF 0b1010 1.5 'a' \"hi\" r\"raw\" r#\"raw#hash\"# // line\n/* block /* nested */ */\n+ - * / % += -= *= /= %= == != < > <= >= << >> .. ..= -> => :: ; , ( ) { } [ ] ? & | ^ ~ . : = $";
+        let file_id = FileId(7);
+        let mut s = Scanner::new(src, file_id);
+
+        let mut tokens: Vec<Token> = Vec::new();
+        loop {
+            let t = s.next_token();
+            let is_eof = matches!(&t.kind, TokenKind::Eof);
+            tokens.push(t);
+            if is_eof {
+                break;
+            }
+        }
+
+        let non_eof_count = tokens
+            .iter()
+            .filter(|t| !matches!(t.kind, TokenKind::Eof))
+            .count();
+        assert!(
+            non_eof_count > 0,
+            "expected at least one non-Eof token, got {} total",
+            tokens.len()
+        );
+
+        for t in &tokens {
+            assert_eq!(
+                t.span.file_id, file_id,
+                "file_id mismatch for token {:?}",
+                t.kind
+            );
+            match &t.kind {
+                TokenKind::Eof => {
+                    assert_eq!(
+                        t.span.start, t.span.end,
+                        "Eof span must be empty, got {:?}",
+                        t.span
+                    );
+                    assert_eq!(
+                        t.span.start as usize,
+                        src.len(),
+                        "Eof must sit at end of input, got {:?}",
+                        t.span
+                    );
+                }
+                _ => {
+                    assert!(
+                        t.span.start < t.span.end,
+                        "non-Eof token {:?} has empty span {:?}",
+                        t.kind,
+                        t.span
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn eat_while_consumes_run() {
         let mut s = Scanner::new("   \t\nrest", FileId(0));
         s.eat_while(|b| b == b' ' || b == b'\t' || b == b'\n');
