@@ -323,7 +323,7 @@
   - [ ] Method `Parser::parse_path` handling `a::b::c` and `Type::<T>::method` turbofish
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::path_with_turbofish`
 
-- [ ] Parse parenthesized + tuple + unit
+- [x] Parse parenthesized + tuple + unit
   - [ ] Disambiguate `(expr)` vs `(a, b)` vs `(x,)` vs `()`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::paren_tuple_unit`
 

@@ -359,3 +359,15 @@
       notes: - Imported `Stmt` by extending the existing `use crate::ast::NodeId;` line into `use crate::ast::{NodeId, Stmt};` rather than adding a separate `use` statement, since merging into the existing same-path import is idiomatic and matches the style elsewhere in this crate (e.g. `ty.rs` uses `use crate::ast::{expr::Path, NodeId};`). The plan said "add `use crate::ast::Stmt;`" — both forms produce the same import; I chose the merged form as the more conservative/idiomatic interpretation. / - Did not add any `impl Stmt { fn id() / fn span() }` accessors, per the plan's Assumptions section.
     [2/72] define-stmt-enum-in-src-ast-stmt-rs: plan $0.77 / execute $0.54 / verified / committed 55b0c50
 ==> plan  define-generics-and-whereclause-in-src-ast-generics-rs
+      plan: 91.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-generics-and-whereclause-in-src-ast-generics-rs-plan-20260427T051959394.txt
+==> exec  define-generics-and-whereclause-in-src-ast-generics-rs
+      exec: 48.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-generics-and-whereclause-in-src-ast-generics-rs-execute-20260427T052047438.txt
+      notes: - Re-export list in `mod.rs` was emitted in alphabetical order (`{Generics, TraitBound, TypeParam, WhereClause, WherePred}`) to match the existing `pub use` style in the file. The plan listed them in declaration order; ordering only affects readability, not the public API. / - Imports in `generics.rs` were grouped as `use crate::ast::expr::{GenericArg, Path};` and `use crate::ast::{NodeId, Type};` (two `use` lines instead of four) — this matches Rust's standard `rustfmt` grouping and keeps the import block minimal. Functionally identical to the four imports listed in step 2.
+    [3/72] define-generics-and-whereclause-in-src-ast-generics-rs: plan $0.56 / execute $0.47 / verified / committed d6e2005
+==> plan  parse-path-expressions
+      plan: 65.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-path-expressions-plan-20260427T052153441.txt
+==> exec  parse-path-expressions
+      exec: 408.03s, failure_mode=infra-error, transcript=.claude\todo-runner\transcripts\parse-path-expressions-execute-20260427T052841475.txt
+      infra-error: API Error: Stream idle timeout - partial response received
+    [4/72] parse-path-expressions: phase-2 infra-error
+==> plan  parse-parenthesized-tuple-unit

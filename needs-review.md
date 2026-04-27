@@ -181,3 +181,16 @@
 
 ---
 
+
+## parse-path-expressions
+- Item: Parse path expressions
+- Reason: phase-2 infra-error
+- Timestamp: 2026-04-27T05:28:41.4804863Z
+
+### Detail
+```
+{"type":"result","subtype":"success","is_error":true,"api_error_status":null,"duration_ms":405803,"duration_api_ms":15432,"num_turns":6,"result":"API Error: Stream idle timeout - partial response received","stop_reason":"stop_sequence","session_id":"74b28e52-ea73-41be-9980-b62e8b4ce1da","total_cost_usd":0.34952475000000005,"usage":{"input_tokens":10,"cache_creation_input_tokens":40299,"cache_read_input_tokens":164014,"output_tokens":546,"server_tool_use":{"web_search_requests":0,"web_fetch_requests":0},"service_tier":"standard","cache_creation":{"ephemeral_1h_input_tokens":40299,"ephemeral_5m_input_tokens":0},"inference_geo":"","iterations":[{"input_tokens":1,"output_tokens":96,"cache_read_input_tokens":41777,"cache_creation_input_tokens":7048,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":7048},"type":"message"}],"speed":"standard"},"modelUsage":{"claude-haiku-4-5-20251001":{"inputTokens":1854,"outputTokens":19,"cacheReadInputTokens":0,"cacheCreationInputTokens":0,"webSearchRequests":0,"costUSD":0.001949,"contextWindow":200000,"maxOutputTokens":32000},"claude-opus-4-7[1m]":{"inputTokens":10,"outputTokens":546,"cacheReadInputTokens":164014,"cacheCreationInputTokens":40299,"webSearchRequests":0,"costUSD":0.34757574999999996,"contextWindow":1000000,"maxOutputTokens":64000}},"permission_denials":[],"terminal_reason":"completed","fast_mode_state":"off","uuid":"adbddcda-9a8b-44ed-a43c-330d9c327922"}
+```
+
+---
+

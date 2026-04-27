@@ -1,4 +1,4 @@
-use crate::ast::expr::{BoolLit, CharLit, Expr, FloatLit, IntLit, StrLit};
+use crate::ast::expr::{BoolLit, CharLit, Expr, FloatLit, IntLit, StrLit, TupleLit};
 use crate::error::{CompileError, ErrorCode, ErrorKind};
 use crate::lexer::token::TokenKind;
 use crate::parser::Parser;
@@ -82,6 +82,69 @@ impl Parser {
         let value = matches!(tok.kind, TokenKind::True);
         let id = self.new_node_id();
         Ok(Expr::BoolLit(BoolLit { id, span, value }))
+    }
+
+    pub fn parse_paren_or_tuple(&mut self) -> Result<Expr, CompileError> {
+        if !matches!(self.peek(), TokenKind::LParen) {
+            return Err(self.unexpected_token_error("`(`"));
+        }
+        let lparen_tok = self.bump();
+        let lparen_span = lparen_tok.span;
+
+        if matches!(self.peek(), TokenKind::RParen) {
+            let rparen_tok = self.bump();
+            let rparen_span = rparen_tok.span;
+            let id = self.new_node_id();
+            return Ok(Expr::TupleLit(TupleLit {
+                id,
+                span: lparen_span.merge(&rparen_span),
+                elems: vec![],
+            }));
+        }
+
+        let first = self.parse_primary_for_paren()?;
+
+        match self.peek() {
+            TokenKind::RParen => {
+                self.bump();
+                Ok(first)
+            }
+            TokenKind::Comma => {
+                self.bump();
+                let mut elems = vec![first];
+                while !matches!(self.peek(), TokenKind::RParen | TokenKind::Eof) {
+                    let elem = self.parse_primary_for_paren()?;
+                    elems.push(elem);
+                    if matches!(self.peek(), TokenKind::Comma) {
+                        self.bump();
+                    } else {
+                        break;
+                    }
+                }
+                let rparen_tok = self.expect(&TokenKind::RParen)?;
+                let rparen_span = rparen_tok.span;
+                let id = self.new_node_id();
+                Ok(Expr::TupleLit(TupleLit {
+                    id,
+                    span: lparen_span.merge(&rparen_span),
+                    elems,
+                }))
+            }
+            _ => Err(self.unexpected_token_error("`,` or `)`")),
+        }
+    }
+
+    // Temporary stub: only handles literal heads. Will be replaced by
+    // `parse_primary` in item 49 once the Pratt driver lands.
+    fn parse_primary_for_paren(&mut self) -> Result<Expr, CompileError> {
+        match self.peek() {
+            TokenKind::IntLiteral(_, _) => self.parse_int_lit(),
+            TokenKind::FloatLiteral(_, _) => self.parse_float_lit(),
+            TokenKind::CharLiteral(_) => self.parse_char_lit(),
+            TokenKind::StringLiteral(_) | TokenKind::RawStringLiteral(_) => self.parse_str_lit(),
+            TokenKind::True | TokenKind::False => self.parse_bool_lit(),
+            _ => Err(self.unexpected_token_error("expression")),
+        }
     }
 
     fn unexpected_token_error(&self, expected: &str) -> CompileError {
@@ -223,6 +286,99 @@ mod tests {
         // wrong token: parse_int_lit on Plus returns Err and does not advance
         let mut p = Parser::new(vec![tok(TokenKind::Plus), tok(TokenKind::Eof)]);
         assert!(p.parse_int_lit().is_err());
+        assert_eq!(p.pos, 0);
+        assert!(p.errors.is_empty());
+    }
+
+    #[test]
+    fn paren_tuple_unit() {
+        // ()
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LParen),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_paren_or_tuple() {
+            Ok(Expr::TupleLit(t)) => assert_eq!(t.elems.len(), 0),
+            other => panic!("expected Ok(TupleLit) for `()`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 2);
+        assert!(p.errors.is_empty());
+
+        // ( 1i32 ) → unwrapped IntLit
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LParen),
+            tok(TokenKind::IntLiteral(1, IntSuffix::I32)),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_paren_or_tuple() {
+            Ok(Expr::IntLit(lit)) => {
+                assert_eq!(lit.value, 1);
+                assert_eq!(lit.suffix, IntSuffix::I32);
+            }
+            other => panic!("expected Ok(IntLit) for `(1i32)`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 3);
+        assert!(p.errors.is_empty());
+
+        // ( 1i32 , ) → 1-tuple
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LParen),
+            tok(TokenKind::IntLiteral(1, IntSuffix::I32)),
+            tok(TokenKind::Comma),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_paren_or_tuple() {
+            Ok(Expr::TupleLit(t)) => {
+                assert_eq!(t.elems.len(), 1);
+                match &t.elems[0] {
+                    Expr::IntLit(lit) => assert_eq!(lit.value, 1),
+                    other => panic!("expected IntLit element, got {:?}", other),
+                }
+            }
+            other => panic!("expected Ok(TupleLit) for `(1i32,)`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 4);
+        assert!(p.errors.is_empty());
+
+        // ( 1i32 , 2i32 )
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LParen),
+            tok(TokenKind::IntLiteral(1, IntSuffix::I32)),
+            tok(TokenKind::Comma),
+            tok(TokenKind::IntLiteral(2, IntSuffix::I32)),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_paren_or_tuple() {
+            Ok(Expr::TupleLit(t)) => assert_eq!(t.elems.len(), 2),
+            other => panic!("expected Ok(TupleLit) for `(1, 2)`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 5);
+        assert!(p.errors.is_empty());
+
+        // ( 1i32 , 2i32 , ) — trailing comma tolerated
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LParen),
+            tok(TokenKind::IntLiteral(1, IntSuffix::I32)),
+            tok(TokenKind::Comma),
+            tok(TokenKind::IntLiteral(2, IntSuffix::I32)),
+            tok(TokenKind::Comma),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_paren_or_tuple() {
+            Ok(Expr::TupleLit(t)) => assert_eq!(t.elems.len(), 2),
+            other => panic!("expected Ok(TupleLit) for `(1, 2,)`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 6);
+        assert!(p.errors.is_empty());
+
+        // wrong head: `+` followed by `Eof`
+        let mut p = Parser::new(vec![tok(TokenKind::Plus), tok(TokenKind::Eof)]);
+        assert!(p.parse_paren_or_tuple().is_err());
         assert_eq!(p.pos, 0);
         assert!(p.errors.is_empty());
     }
