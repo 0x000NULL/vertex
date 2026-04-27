@@ -530,7 +530,7 @@
   - [ ] `*const T`, `*mut T`
   - [ ] **Verify:** `cargo test --lib parser::ty::tests::raw_ptr_types`
 
-- [ ] Parse slice + array types
+- [x] Parse slice + array types
   - [ ] `&[T]`, `[T; N]` (where `N` is a const expr)
   - [ ] **Verify:** `cargo test --lib parser::ty::tests::slice_and_array_types`
 

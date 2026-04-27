@@ -623,3 +623,7 @@
 ==> plan  parse-raw-pointer-types
       plan: 70.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-raw-pointer-types-plan-20260427T084642598.txt
 ==> exec  parse-raw-pointer-types
+      exec: 110.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-raw-pointer-types-execute-20260427T084832647.txt
+      notes: - The plan says "push a `CompileError` via the parser's existing error helper" for the malformed-`*` recovery. The existing pushed-error helpers (`expected_token_error`, `expected_one_of_error`) both call `recover_to_sync`, which would skip past the inner type and contradict the plan's "treat as `const` so the inner type still parses". I picked the most conservative interpretation: construct `CompileError::new(ErrorCode::E0100, ErrorKind::Syntax, …)` directly and push to `self.errors` — the same pattern used in `parser/item.rs:321` for tolerant in-place pushes — and continued into `parse_type()`. The chosen error span is the `*` token's span, with message "expected `const` or `mut` after `*`". / - The recovery path is not exercised by the test, per the plan's risks section.
+    [46/72] parse-raw-pointer-types: plan $0.36 / execute $0.65 / verified / committed 42a1f95
+==> plan  parse-slice-array-types

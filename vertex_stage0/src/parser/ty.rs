@@ -13,6 +13,9 @@ impl Parser {
         if matches!(self.peek(), TokenKind::Star) {
             return self.parse_ptr_type();
         }
+        if matches!(self.peek(), TokenKind::LBracket) {
+            return self.parse_bracketed_type();
+        }
         // Stopgap path-type body: replaced by `parse-path-types-with-generic-args`.
         let ident_tok = self.expect(&TokenKind::Ident(String::new()))?;
         let span = ident_tok.span;
@@ -63,6 +66,25 @@ impl Parser {
         })
     }
 
+    fn parse_bracketed_type(&mut self) -> Result<Type, CompileError> {
+        debug_assert!(matches!(self.peek(), TokenKind::LBracket));
+        self.bump();
+        let elem = self.parse_type()?;
+        if matches!(self.peek(), TokenKind::Semi) {
+            self.bump();
+            let len = self.parse_expr()?;
+            self.expect(&TokenKind::RBracket)?;
+            return Ok(Type::Array {
+                elem: Box::new(elem),
+                len: Box::new(len),
+            });
+        }
+        self.expect(&TokenKind::RBracket)?;
+        Ok(Type::Slice {
+            elem: Box::new(elem),
+        })
+    }
+
     fn parse_ref_type(&mut self) -> Result<Type, CompileError> {
         debug_assert!(matches!(self.peek(), TokenKind::Amp));
         let amp_tok = self.bump();
@@ -97,6 +119,8 @@ fn type_span(ty: &Type) -> Span {
         Type::Path(p) => p.span,
         Type::Ref { span, .. } => *span,
         Type::Ptr { ty, .. } => type_span(ty),
+        Type::Array { elem, .. } => type_span(elem),
+        Type::Slice { elem } => type_span(elem),
         _ => unreachable!("type_span: unexpected variant from stopgap parse_type"),
     }
 }
@@ -104,7 +128,8 @@ fn type_span(ty: &Type) -> Span {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lexer::token::Token;
+    use crate::ast::expr::Expr;
+    use crate::lexer::token::{IntSuffix, Token};
     use crate::span::FileId;
 
     fn tok(kind: TokenKind) -> Token {
@@ -258,6 +283,58 @@ mod tests {
                 }
             }
             other => panic!("expected outer Type::Ptr, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+    }
+
+    #[test]
+    fn slice_and_array_types() {
+        // &[i32]
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Amp),
+            tok(TokenKind::LBracket),
+            ident_tok("i32"),
+            tok(TokenKind::RBracket),
+            tok(TokenKind::Eof),
+        ]);
+        let ty = p.parse_type().expect("parse_type &[i32]");
+        match ty {
+            Type::Ref { mutable, ty, .. } => {
+                assert!(!mutable);
+                match *ty {
+                    Type::Slice { elem } => {
+                        assert_path_ident(&elem, "i32");
+                    }
+                    other => panic!("expected Type::Slice, got {:?}", other),
+                }
+            }
+            other => panic!("expected Type::Ref, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // [i32; 4]
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBracket),
+            ident_tok("i32"),
+            tok(TokenKind::Semi),
+            tok(TokenKind::IntLiteral(4, IntSuffix::Unsuffixed)),
+            tok(TokenKind::RBracket),
+            tok(TokenKind::Eof),
+        ]);
+        let ty = p.parse_type().expect("parse_type [i32; 4]");
+        match ty {
+            Type::Array { elem, len } => {
+                assert_path_ident(&elem, "i32");
+                match *len {
+                    Expr::IntLit(lit) => {
+                        assert_eq!(lit.value, 4);
+                    }
+                    other => panic!("expected Expr::IntLit, got {:?}", other),
+                }
+            }
+            other => panic!("expected Type::Array, got {:?}", other),
         }
         assert!(p.errors.is_empty());
         assert!(matches!(p.peek(), TokenKind::Eof));
