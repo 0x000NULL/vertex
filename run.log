@@ -116,3 +116,9 @@
 ==> exec  implement-string-literal-scanning-regular
       exec: 107.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-string-literal-scanning-regular-execute-20260427T032632958.txt
       notes: - Renamed `scan_char_escape` to `scan_escape_char` per the plan's suggested name; preserved its exact behavior (entry at `\`, advances past the sequence, leaves `pos` wherever it ended on failure so callers rewind to their saved start). / - Consolidated the two duplicate "missing close" rejection cases from the plan (`"abc` and `"\"abc"` typed-as-`"abc`) into a single `"abc` rejection input — they describe identical input. Other rejections remain distinct.
+    [17/113] implement-string-literal-scanning-regular: plan $0.30 / execute $0.55 / verified / committed de5c0db
+==> plan  implement-raw-string-literal-scanning
+      plan: 56.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-raw-string-literal-scanning-plan-20260427T032730171.txt
+==> exec  implement-raw-string-literal-scanning
+      exec: 89.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-raw-string-literal-scanning-execute-20260427T032859209.txt
+      notes: - The plan suggested using `peek_at(1..=hash_count)` style; I used a simple `for i in 0..hash_count { peek_at(1 + i) }` loop since `peek_at` takes a single `usize`. Behavior is identical. / - For the embedded-newline happy case I used `r"a\nb"` (the source string `"r\"a\nb\""` containing a single literal newline byte) per the plan's "embedded actual newline" example. The plan's text mentioned both a `\n`-as-escape-text variant and a literal-newline variant; I included `r"\n"` (literal backslash-n preserved) and `r"a\nb"` (literal newline byte preserved) to cover both.

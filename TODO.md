@@ -177,7 +177,7 @@
   - [ ] Reject mismatched `#` counts; preserve content verbatim
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::raw_string_arbitrary_hashes`
 
-- [ ] Implement line and block comment scanning
+- [x] Implement line and block comment scanning
   - [ ] Method `Scanner::skip_comments`
   - [ ] `// ... \n` and `/* ... */` with proper nesting depth counter
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::nested_block_comments`

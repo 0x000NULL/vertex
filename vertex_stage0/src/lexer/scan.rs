@@ -52,6 +52,49 @@ impl<'a> Scanner<'a> {
         }
     }
 
+    pub fn skip_comments(&mut self) -> bool {
+        let start = self.pos;
+
+        if self.peek() == Some(b'/') && self.peek_at(1) == Some(b'/') {
+            match self.peek_at(2) {
+                Some(b'/') | Some(b'!') => return false,
+                _ => {}
+            }
+            self.pos += 2;
+            self.eat_while(|b| b != b'\n');
+            return true;
+        }
+
+        if self.peek() == Some(b'/') && self.peek_at(1) == Some(b'*') {
+            self.pos += 2;
+            let mut depth: usize = 1;
+            loop {
+                match (self.peek(), self.peek_at(1)) {
+                    (Some(b'/'), Some(b'*')) => {
+                        self.pos += 2;
+                        depth += 1;
+                    }
+                    (Some(b'*'), Some(b'/')) => {
+                        self.pos += 2;
+                        depth -= 1;
+                        if depth == 0 {
+                            return true;
+                        }
+                    }
+                    (Some(_), _) => {
+                        self.pos += 1;
+                    }
+                    (None, _) => {
+                        self.pos = start;
+                        return false;
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
     pub fn scan_int_decimal(&mut self) -> (u64, IntSuffix, Span) {
         let start = self.pos as u32;
         let mut value: u64 = 0;
@@ -813,6 +856,50 @@ mod tests {
             );
             assert_eq!(s.pos, 0, "expected pos=0 after rejecting {:?}", input);
         }
+    }
+
+    #[test]
+    fn nested_block_comments() {
+        let mut s = Scanner::new("// hello\n", FileId(0));
+        assert!(s.skip_comments());
+        assert_eq!(s.pos, "// hello".len());
+        assert_eq!(s.peek(), Some(b'\n'));
+
+        let mut s = Scanner::new("/* hi */rest", FileId(0));
+        assert!(s.skip_comments());
+        assert_eq!(&s.src[s.pos..], "rest");
+
+        let mut s = Scanner::new("/* a /* b */ c */tail", FileId(0));
+        assert!(s.skip_comments());
+        assert_eq!(&s.src[s.pos..], "tail");
+
+        let mut s = Scanner::new("/*/*/*x*/*/*/Z", FileId(0));
+        assert!(s.skip_comments());
+        assert_eq!(&s.src[s.pos..], "Z");
+
+        let mut s = Scanner::new("/**/X", FileId(0));
+        assert!(s.skip_comments());
+        assert_eq!(&s.src[s.pos..], "X");
+
+        let mut s = Scanner::new("/* never ends", FileId(0));
+        assert!(!s.skip_comments());
+        assert_eq!(s.pos, 0);
+
+        let mut s = Scanner::new("/* a /* b */ c", FileId(0));
+        assert!(!s.skip_comments());
+        assert_eq!(s.pos, 0);
+
+        let mut s = Scanner::new("/// doc\n", FileId(0));
+        assert!(!s.skip_comments());
+        assert_eq!(s.pos, 0);
+
+        let mut s = Scanner::new("//! doc\n", FileId(0));
+        assert!(!s.skip_comments());
+        assert_eq!(s.pos, 0);
+
+        let mut s = Scanner::new("abc", FileId(0));
+        assert!(!s.skip_comments());
+        assert_eq!(s.pos, 0);
     }
 
     #[test]
