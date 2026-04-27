@@ -530,3 +530,11 @@
       notes: - Split self-form parsing into three private helpers (`parse_self_param_value`, `parse_self_param_ref`, plus the public dispatcher `try_parse_self_param`) instead of inlining everything in one method, since the bare-`self` and `&[mut] self` forms share no consumed-tokens. Plan said "a helper", so this is a conservative interpretation that keeps each helper short. / - Added a small private `synth_self_path_type(span)` helper to build the `Type::Path(Self)` value reused by the value form (no annotation) and inside the `&self`/`&mut self` ref types — avoids duplicating the `Path` literal.
     [30/72] add-self-parameters: plan $0.96 / execute $1.26 / verified / committed 63ce1e8
 ==> plan  add-generics-and-where-clauses-to-function-items
+      plan: 113.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-generics-and-where-clauses-to-function-items-plan-20260427T073858538.txt
+==> exec  add-generics-and-where-clauses-to-function-items
+      exec: 224.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-generics-and-where-clauses-to-function-items-execute-20260427T074242588.txt
+      notes: - Step 8 says "if either generic params or a where clause is present" — I interpreted "generic params present" as `generics_list_span.is_some()` (i.e., a `<...>` was actually parsed) rather than `!params.is_empty()`. This means an empty `<>` would still produce `Some(Generics)` rather than collapsing to `None`. The verify case has 2 params so this distinction is not exercised; the conservative read is to faithfully record any `<...>` the user wrote, not silently drop it. / - For capturing the opening `<` span in `parse_fn`, I read `self.tokens[self.pos].span` directly before calling `parse_generics_params` (the helper bumps `<` itself). The Parser exposes `pos` and `tokens` as `pub` fields, so this stays within the existing API surface and matches how callers already inspect parser state in `peek_at`.
+    [31/72] add-generics-and-where-clauses-to-function-items: plan $0.76 / execute $2.00 / verified / committed f4c000d
+==> plan  parse-normal-struct-items
+      plan: 149.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-normal-struct-items-plan-20260427T074513406.txt
+==> exec  parse-normal-struct-items

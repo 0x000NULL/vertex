@@ -1,6 +1,6 @@
 use crate::ast::expr::{Expr, GenericArg, Path, PathSegment};
 use crate::ast::generics::{Generics, TraitBound, TypeParam, WhereClause, WherePred};
-use crate::ast::item::{FnDef, Item, Param};
+use crate::ast::item::{Field, FnDef, Item, Param, StructDef};
 use crate::ast::ty::Type;
 use crate::error::{CompileError, ErrorCode, ErrorKind};
 use crate::lexer::token::TokenKind;
@@ -439,6 +439,74 @@ impl Parser {
             is_unsafe,
             extern_abi,
             generics,
+        }))
+    }
+
+    pub fn parse_struct(&mut self) -> Result<Item, CompileError> {
+        let struct_kw = self.expect(&TokenKind::Struct)?;
+        let start_span = struct_kw.span;
+
+        let name_tok = self.expect(&TokenKind::Ident(String::new()))?;
+        let name = match name_tok.kind {
+            TokenKind::Ident(s) => s,
+            _ => unreachable!(),
+        };
+
+        let mut generic_params: Vec<TypeParam> = Vec::new();
+        let mut generics_list_span: Option<Span> = None;
+        if matches!(self.peek(), TokenKind::Lt) {
+            let lt_span = self.tokens[self.pos].span;
+            let (params, gt_span) = self.parse_generics_params()?;
+            generic_params = params;
+            generics_list_span = Some(lt_span.merge(&gt_span));
+        }
+
+        self.expect(&TokenKind::LBrace)?;
+        let mut fields: Vec<Field> = Vec::new();
+        while !matches!(self.peek(), TokenKind::RBrace) {
+            let is_pub = self.eat(&TokenKind::Pub);
+            let fname_tok = self.expect(&TokenKind::Ident(String::new()))?;
+            let fname_span = fname_tok.span;
+            let fname = match fname_tok.kind {
+                TokenKind::Ident(s) => s,
+                _ => unreachable!(),
+            };
+            self.expect(&TokenKind::Colon)?;
+            let fty = self.parse_type()?;
+            let fspan = fname_span.merge(&type_span(&fty));
+            let fid = self.new_node_id();
+            fields.push(Field {
+                id: fid,
+                span: fspan,
+                name: fname,
+                ty: fty,
+                is_pub,
+            });
+            if !self.eat(&TokenKind::Comma) {
+                break;
+            }
+        }
+        let rbrace_tok = self.expect(&TokenKind::RBrace)?;
+        let end_span = rbrace_tok.span;
+
+        let generics = generics_list_span.map(|span| {
+            let id = self.new_node_id();
+            Generics {
+                id,
+                span,
+                params: generic_params,
+                where_clause: None,
+            }
+        });
+
+        let span = start_span.merge(&end_span);
+        let id = self.new_node_id();
+        Ok(Item::Struct(StructDef {
+            id,
+            span,
+            name,
+            generics,
+            fields,
         }))
     }
 }
@@ -902,6 +970,51 @@ mod tests {
         assert_eq!(f.params[1].name, "x");
         assert!(!f.params[1].is_self);
         assert_eq!(type_ident(&f.params[1].ty), "i32");
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+    }
+
+    fn as_struct(item: Item) -> StructDef {
+        match item {
+            Item::Struct(s) => s,
+            other => panic!("expected Item::Struct, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn struct_normal() {
+        // struct Name<T> { field: Ty, pub field2: Ty }
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Struct),
+            ident_tok("Name"),
+            tok(TokenKind::Lt),
+            ident_tok("T"),
+            tok(TokenKind::Gt),
+            tok(TokenKind::LBrace),
+            ident_tok("field"),
+            tok(TokenKind::Colon),
+            ident_tok("Ty"),
+            tok(TokenKind::Comma),
+            tok(TokenKind::Pub),
+            ident_tok("field2"),
+            tok(TokenKind::Colon),
+            ident_tok("Ty"),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let s = as_struct(p.parse_struct().expect("parse_struct"));
+        assert_eq!(s.name, "Name");
+        let generics = s.generics.as_ref().expect("generics");
+        assert_eq!(generics.params.len(), 1);
+        assert_eq!(generics.params[0].name, "T");
+        assert!(generics.params[0].bounds.is_empty());
+        assert_eq!(s.fields.len(), 2);
+        assert_eq!(s.fields[0].name, "field");
+        assert_eq!(type_ident(&s.fields[0].ty), "Ty");
+        assert!(!s.fields[0].is_pub);
+        assert_eq!(s.fields[1].name, "field2");
+        assert_eq!(type_ident(&s.fields[1].ty), "Ty");
+        assert!(s.fields[1].is_pub);
         assert!(p.errors.is_empty());
         assert!(matches!(p.peek(), TokenKind::Eof));
     }

@@ -33,9 +33,22 @@ pub struct FnDef {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
+pub struct Field {
+    pub id: NodeId,
+    pub span: Span,
+    pub name: String,
+    pub ty: Type,
+    pub is_pub: bool,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub struct StructDef {
     pub id: NodeId,
     pub span: Span,
+    pub name: String,
+    pub generics: Option<Generics>,
+    pub fields: Vec<Field>,
 }
 
 #[allow(dead_code)]

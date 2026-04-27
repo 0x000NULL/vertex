@@ -453,7 +453,7 @@
 
 ## 13. Item parsers — types
 
-- [ ] Parse normal struct items
+- [x] Parse normal struct items
   - [ ] `struct Name<T> { field: Ty, pub field2: Ty }`
   - [ ] **Verify:** `cargo test --lib parser::item::tests::struct_normal`
 
