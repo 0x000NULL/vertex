@@ -75,7 +75,7 @@
 
 ## 2. Error reporting
 
-- [ ] Define `ErrorCode` and `ErrorKind` in `src/error.rs`
+- [x] Define `ErrorCode` and `ErrorKind` in `src/error.rs`
   - [ ] `ErrorCode(pub u32)` newtype with associated consts `E0001..E1999` ranges (lex / syntax / resolve / type / borrow / other)
   - [ ] `ErrorKind` enum: `Lexical, Syntax, NameResolution, Type, BorrowCheck, Other`
   - [ ] **Verify:** `cargo build`; `grep -q 'pub struct ErrorCode' src/error.rs`; `grep -q 'pub enum ErrorKind' src/error.rs`

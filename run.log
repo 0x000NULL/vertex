@@ -16,3 +16,7 @@
       notes: - Triggers `push:` and `pull_request:` are written with no branch filters, matching the plan's "to any branch" wording. / - Used the workflow name `CI` (conventional, plan did not specify); job id is `ci` per the plan.
     [1/113] add-ci-workflow: plan $0.40 / execute $0.24 / verified / committed 0c13210
 ==> plan  implement-span-struct-in-src-span-rs
+      plan: 60.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-span-struct-in-src-span-rs-plan-20260427T025129142.txt
+==> exec  implement-span-struct-in-src-span-rs
+      exec: 65.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-span-struct-in-src-span-rs-execute-20260427T025234224.txt
+      notes: - For `len()`, the plan specified `u32` and `self.end - self.start`; used directly without overflow guards since the codebase invariant is `end >= start`. / - The `span_merge_takes_outer_bounds` test covers both overlapping and disjoint cases, asserts symmetry, and asserts `len() == end - start` on the result, per the plan.

@@ -1,48 +1,59 @@
-Here's the plan.
-
 # Plan: define-errorcode-and-errorkind-in-src-error-rs
 
 ## Goal
-Populate the empty `vertex_stage0/src/error.rs` with an `ErrorCode(pub u32)` newtype carrying associated-const range markers (`E0001..E1999` partitioned across lex/syntax/resolve/type/borrow/other) and an `ErrorKind` enum covering those same six diagnostic categories.
+Flesh out the `ErrorCode` newtype with category-range associated constants (E0001–E1999) and confirm the `ErrorKind` enum covers all six categories in `vertex_stage0/src/error/mod.rs`.
 
 ## Steps
-1. Open `vertex_stage0/src/error.rs` (currently a 1-line empty file) and write the full module body.
-2. Define `pub struct ErrorCode(pub u32)` with derives `Copy, Clone, PartialEq, Eq, Hash, Debug` (matching `FileId` style in `span.rs`).
-3. On `impl ErrorCode`, declare `pub const` range markers spanning E0001..E1999. Use a six-band partition (each band = 333 codes, last band absorbs remainder) so every `ErrorKind` has a contiguous `_START`/`_END` pair:
-   - `LEXICAL_START = ErrorCode(1)`, `LEXICAL_END = ErrorCode(333)`
-   - `SYNTAX_START = ErrorCode(334)`, `SYNTAX_END = ErrorCode(666)`
-   - `NAME_RESOLUTION_START = ErrorCode(667)`, `NAME_RESOLUTION_END = ErrorCode(999)`
-   - `TYPE_START = ErrorCode(1000)`, `TYPE_END = ErrorCode(1332)`
-   - `BORROW_CHECK_START = ErrorCode(1333)`, `BORROW_CHECK_END = ErrorCode(1665)`
-   - `OTHER_START = ErrorCode(1666)`, `OTHER_END = ErrorCode(1999)`
-4. Define `pub enum ErrorKind { Lexical, Syntax, NameResolution, Type, BorrowCheck, Other }` with derives `Copy, Clone, PartialEq, Eq, Hash, Debug`.
-5. Run `cargo build -p vertex_stage0` to confirm the new module compiles cleanly with no warnings introduced.
+1. Open `vertex_stage0/src/error/mod.rs` and confirm the existing `pub struct ErrorCode(pub u32);` newtype and `pub enum ErrorKind { Lexical, Syntax, NameResolution, Type, BorrowCheck, Other }` enum (already present from prior work).
+2. Expand the `impl ErrorCode` block to add representative associated constants spanning all six category ranges per `compiler_architecture.md` §"Error Code System":
+   - Lexical (E0001–E0099): `E0001` (invalid character), `E0002` (unterminated string), `E0003` (invalid numeric literal).
+   - Syntax (E0100–E0299): `E0100` (unexpected token), `E0101` (unclosed delimiter), `E0102` (missing semicolon).
+   - Name resolution (E0300–E0499): `E0425` (unresolved name), `E0433` (failed to resolve import); keep `E0308` co-located with type errors below since it's a type code per the architecture doc.
+   - Type (E0500–E0799): retain `E0308` (type mismatch — note: lives outside the 500–799 band but is the canonical rustc-style code; keep as-is), add `E0369` (binop not supported), `E0277` (trait bound), `E0599` (method not found), `E0608` (string index).
+   - Borrow check (E0800–E0999): retain `E0502`; add `E0382` (moved value), `E0499` (mut-borrow twice), `E0503`, `E0505`.
+   - Other (E1000–E1999): add `E1000` (placeholder/internal), `E1001` (const eval failed), `E1002` (unsafe in const).
+3. Add a short doc comment above each constant indicating its meaning (the `--explain` subcommand, planned later, will key off these). Keep names matching the rustc-style `E####` literal exactly so the `explain E0xxx` subcommand can do a string match.
+4. Leave `ErrorKind` untouched (already complete: six variants).
+5. Run `cargo build` and `cargo fmt` to confirm the additions compile and stay tidy. The existing `render.rs` consumers already reference `ErrorCode::E0308` / `E0502` and must continue to compile unchanged.
 
 ## Files
-- `vertex_stage0/src/error.rs` -- replace empty contents with `ErrorCode` newtype, six pairs of range constants spanning E0001..E1999, and the `ErrorKind` enum.
+- `vertex_stage0/src/error/mod.rs` -- add associated `ErrorCode` constants for the lex/syntax/resolve/type/borrow/other ranges; preserve the already-present `ErrorKind` enum and `CompileError` struct.
 
 ## Risks
-- The todo string `src/error.rs` is shorthand; the actual path is `vertex_stage0/src/error.rs` (single-crate workspace). Editing the wrong path would silently no-op.
-- `cargo build` for a library item with only type definitions will emit `dead_code` warnings if the crate's lint config is strict (`-D warnings`). Mitigation: no `#![deny(warnings)]` is currently set in `lib.rs`, so plain `cargo build` should pass; the verify step uses `cargo build` (not `cargo build -- -D warnings`).
-- Choosing exact numeric boundaries for the six bands is somewhat arbitrary; downstream items that allocate concrete codes (e.g., `E0101`) must sit inside the band declared here. An even six-way split keeps every band non-empty and leaves room.
+- The todo description says `src/error.rs`, but the actual file lives at `vertex_stage0/src/error/mod.rs` (a directory module). Editing `mod.rs` is the correct location; don't create a duplicate `src/error.rs` file or it'll shadow/conflict with the directory module.
+- The `E0308` / `E0502` constants already exist; re-declaring them would be a compile error. Add only NEW constants, leaving the existing two intact.
+- Vertex's architecture doc places `E0308` (type mismatch) and `E0277` (trait bound) outside their nominal ranges to mirror rustc; resist the urge to renumber them.
+- `pub u32` newtype is already specified — don't switch to `u16` even though `compiler_architecture.md` shows `u16` in pseudo-code; the existing field type and `with_label` callers depend on `u32`.
+
+## Prereqs
+Prereqs: none
+
+(The companion item `define-compileerror-struct-in-src-error-rs` consumes `ErrorCode`/`ErrorKind`, so this plan is its prerequisite — not the other way around. The `CompileError` struct already happens to coexist in the same file, but the todo run will treat that as a separate item; nothing to depend on here.)
 
 ## Verify
 ```
-cargo build -p vertex_stage0
-grep -q 'pub struct ErrorCode' vertex_stage0/src/error.rs
-grep -q 'pub enum ErrorKind' vertex_stage0/src/error.rs
+cargo build --manifest-path vertex_stage0/Cargo.toml
+cargo fmt --manifest-path vertex_stage0/Cargo.toml -- --check
+grep -q 'pub struct ErrorCode' vertex_stage0/src/error/mod.rs
+grep -q 'pub enum ErrorKind' vertex_stage0/src/error/mod.rs
+grep -q 'E0001' vertex_stage0/src/error/mod.rs
+grep -q 'E0100' vertex_stage0/src/error/mod.rs
+grep -q 'E0382' vertex_stage0/src/error/mod.rs
+grep -q 'E1000' vertex_stage0/src/error/mod.rs
+grep -q 'Lexical' vertex_stage0/src/error/mod.rs
+grep -q 'BorrowCheck' vertex_stage0/src/error/mod.rs
 ```
 
 ## Assumptions
-- "src/error.rs" in the todo refers to `vertex_stage0/src/error.rs` (the only crate in this workspace; verified by `Cargo.toml` and the existing empty `error.rs`).
-- The `E0001..E1999` range is inclusive of both endpoints, partitioned into six bands; an even split (≈333 codes/band, last band gets the remainder up to 1999) is acceptable since the todo only specifies the overall range and the six categories, not per-band sizes.
-- Range markers are exposed as associated `pub const` items on `ErrorCode` (e.g., `ErrorCode::LEXICAL_START`) rather than free constants -- this matches Rust idiom and keeps the namespace tidy.
-- `ErrorKind` and `ErrorCode` derive the standard small-value derives (`Copy, Clone, PartialEq, Eq, Hash, Debug`) consistent with `FileId` in `span.rs`. No `serde`, `Display`, or `thiserror` integration is added -- not requested by this todo.
-- No `pub use` re-export is added to `lib.rs`; `error` is already declared as `pub mod error` so `vertex_stage0::error::ErrorCode` is reachable.
-- No conversion/helper methods (e.g., `ErrorCode::kind() -> ErrorKind`) are added; the todo lists only the type definitions and the verify greps only assert the type declarations exist. Helpers belong to a follow-up item if needed.
+- "in `src/error.rs`" in the todo refers to the canonical error module, which currently lives at `vertex_stage0/src/error/mod.rs`. Editing `mod.rs` (rather than collapsing the dir back to a single file) preserves the existing `error::render` submodule and its tests.
+- The "associated consts E0001..E1999 ranges" sub-step asks for *representative* constants across ranges, not all 1999 codes. I'm picking ~3–5 per range, matching codes already enumerated in `compiler_architecture.md` so future error-emission code has well-known names to reach for.
+- Keep the existing `E0308` and `E0502` constants exactly as-is so `error/render.rs` tests keep passing without touching them.
+- Constants stay on `ErrorCode` (associated `pub const`) rather than turning into a separate enum; the existing newtype shape is the contract referenced by `CompileError::new(code, …)` and its callers.
+- No need to add `Display`/`Debug` impls beyond the existing `derive`s; the `--explain` subcommand item will own that wiring later.
+- No `ErrorKind` changes required — all six variants (`Lexical, Syntax, NameResolution, Type, BorrowCheck, Other`) already exist verbatim from the prior commit.
 
 ## Blockers
 Blockers: none
 
 ## Summary
-Adds the `ErrorCode` newtype with six range constants covering E0001..E1999 and the six-variant `ErrorKind` enum to the previously empty `vertex_stage0/src/error.rs`, giving the diagnostics subsystem its foundational types.
+Expand `ErrorCode` with category-range associated constants spanning lex/syntax/resolve/type/borrow/other; `ErrorKind` already lists all six variants and stays as-is.
