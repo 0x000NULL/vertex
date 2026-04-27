@@ -1907,4 +1907,54 @@ mod tests {
             assert_eq!(last.span.start as usize, src.len());
         }
     }
+
+    fn next_rand(state: &mut u64) -> u64 {
+        let mut x = *state;
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        *state = x;
+        x
+    }
+
+    #[test]
+    fn fuzz_random_bytes_no_panic() {
+        let seed: u64 = 0x9E3779B97F4A7C15;
+        let mut state = seed;
+
+        for iter in 0..1000usize {
+            let len = (next_rand(&mut state) as usize) % 257;
+            let mut bytes: Vec<u8> = Vec::with_capacity(len);
+            for _ in 0..len {
+                bytes.push(next_rand(&mut state) as u8);
+            }
+
+            let s = String::from_utf8_lossy(&bytes).into_owned();
+            let mut scanner = Scanner::new(&s, FileId(0));
+
+            let cap = 4 * s.len() + 16;
+            let mut steps = 0usize;
+            loop {
+                let prev_pos = scanner.pos;
+                let tok = scanner.next_token();
+                steps += 1;
+
+                if matches!(tok.kind, TokenKind::Eof) {
+                    break;
+                }
+
+                assert!(
+                    scanner.pos > prev_pos,
+                    "scanner failed to advance (seed={:#x}, iter={}, pos={}, input={:?})",
+                    seed, iter, scanner.pos, bytes
+                );
+
+                assert!(
+                    steps <= cap,
+                    "scanner exceeded iteration cap {} (seed={:#x}, iter={}, input={:?})",
+                    cap, seed, iter, bytes
+                );
+            }
+        }
+    }
 }

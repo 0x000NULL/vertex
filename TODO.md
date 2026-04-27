@@ -222,7 +222,7 @@
   - [ ] On parse failure, emit error and advance past the offending run
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::invalid_numeric_recovers`
 
-- [ ] Fuzz-style robustness test
+- [x] Fuzz-style robustness test
   - [ ] In tests, run `Scanner::new` on 1000 random byte sequences (PRNG-seeded) and assert no panic
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::fuzz_random_bytes_no_panic`
 
