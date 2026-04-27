@@ -194,3 +194,25 @@
 
 ---
 
+
+## parse-struct-literal-expressions
+- Item: Parse struct literal expressions
+- Reason: blockers
+- Timestamp: 2026-04-27T06:09:15.5886326Z
+
+### Blocker: shape of parse_path return type
+- severity: cross-item
+- affects: parse-path-expressions, parse-struct-literal-expressions, parse-function-call-method-call-field-access
+- question: Does the prereq `parse-path-expressions` plan return `Result<Path, CompileError>` (the `ast::expr::Path` struct) or `Result<Expr, CompileError>` wrapping `Expr::Path(Path)`?
+- default_assumption: Assume it returns `Result<Path, CompileError>`. If it returns `Result<Expr, CompileError>` instead, destructure `Expr::Path(p) => p` at the call site in `parse_primary_for_paren`; this is a one-line adaptation and does not change the rest of the plan.
+- Resolution: 
+
+### Blocker: scope of disambiguation lever in this commit
+- severity: local
+- affects: parse-if-else-expressions, parse-loop-while-for-expressions, parse-match-expressions
+- question: Should this commit also wire `restrict_struct_literal=true` into the (currently nonexistent) `if`/`while`/`for`/`match` head parsers, or only land the flag and let those items consume it?
+- default_assumption: Land the flag and the consumer site only; do NOT modify `if`/`while`/`for`/`match` parsers (they don't exist yet). Document in the test that the flag suppresses struct-literal interpretation, leaving full integration to the dedicated control-flow items.
+- Resolution: 
+
+---
+

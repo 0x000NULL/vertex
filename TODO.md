@@ -357,7 +357,7 @@
   - [ ] Disambiguate from block expressions in `if`/`while` heads (per Rust convention)
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::struct_literal`
 
-- [ ] Parse array literal expressions
+- [x] Parse array literal expressions
   - [ ] `[a, b, c]` and `[value; count]`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::array_literal_and_repeat`
 

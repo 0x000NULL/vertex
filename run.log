@@ -405,3 +405,11 @@
 ==> exec  parse-range-expressions
       exec: 94.34s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-range-expressions-execute-20260427T060120995.txt
       notes: - Implemented `..=` symmetrically as a prefix form (no extra code cost), as the plan's Assumptions section explicitly authorized. / - Did not add a non-associative chained-range guard (`a..b..c`); the plan calls this a deferable risk and `range_forms` does not exercise it, so I left the LHS unchanged on a non-range continuation per the conservative reading.
+    [10/72] parse-range-expressions: plan $0.84 / execute $0.76 / verified / committed a6e5af3
+==> plan  parse-closure-expressions
+      plan: 124.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-closure-expressions-plan-20260427T060326067.txt
+==> exec  parse-closure-expressions
+      exec: 201.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-closure-expressions-execute-20260427T060647106.txt
+      notes: - **`current_span` inlined**: the plan's "capture the start span" was implemented with the inline `if self.pos < self.tokens.len() { ... }` pattern already used elsewhere in `parse_unary` and `unexpected_token_error`, rather than calling the private `Parser::current_span` from `parser/mod.rs`. This matches existing style in the file. / - **Negative-test token sequence**: the plan listed `| 1i32` as the negative case. With tokens `[Pipe, IntLit, Eof]`, the failure surfaces in `parse_closure_param` ("expected identifier") rather than at the closing `|` — both produce E0100, which is what the plan asserts on. Conservative interpretation: assert only the error code, not the message.
+    [11/72] parse-closure-expressions: plan $0.77 / execute $1.20 / verified / committed 4d55fd5
+==> plan  parse-struct-literal-expressions

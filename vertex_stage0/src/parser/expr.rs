@@ -1,7 +1,7 @@
 use crate::ast::expr::{
-    Binary, BinaryOp, Block, BoolLit, Call, Cast, CastTy, CharLit, Closure, ClosureParam, Expr,
-    FieldAccess, FloatLit, Index, IntLit, MethodCall, Range, StrLit, Try, TupleFieldAccess,
-    TupleLit, Unary, UnaryOp,
+    ArrayLit, ArrayRepeat, Binary, BinaryOp, Block, BoolLit, Call, Cast, CastTy, CharLit, Closure,
+    ClosureParam, Expr, FieldAccess, FloatLit, Index, IntLit, MethodCall, Range, StrLit, Try,
+    TupleFieldAccess, TupleLit, Unary, UnaryOp,
 };
 use crate::error::{CompileError, ErrorCode, ErrorKind};
 use crate::lexer::token::TokenKind;
@@ -142,6 +142,71 @@ impl Parser {
                 }))
             }
             _ => Err(self.unexpected_token_error("`,` or `)`")),
+        }
+    }
+
+    fn parse_array_literal(&mut self) -> Result<Expr, CompileError> {
+        if !matches!(self.peek(), TokenKind::LBracket) {
+            return Err(self.unexpected_token_error("`[`"));
+        }
+        let lbracket_tok = self.bump();
+        let lbracket_span = lbracket_tok.span;
+
+        if matches!(self.peek(), TokenKind::RBracket) {
+            let rbracket_tok = self.bump();
+            let id = self.new_node_id();
+            return Ok(Expr::ArrayLit(ArrayLit {
+                id,
+                span: lbracket_span.merge(&rbracket_tok.span),
+                elems: vec![],
+            }));
+        }
+
+        let first = self.parse_expr()?;
+
+        match self.peek() {
+            TokenKind::Semi => {
+                self.bump();
+                let count = self.parse_expr()?;
+                let rbracket_tok = self.expect(&TokenKind::RBracket)?;
+                let id = self.new_node_id();
+                Ok(Expr::ArrayRepeat(ArrayRepeat {
+                    id,
+                    span: lbracket_span.merge(&rbracket_tok.span),
+                    value: Box::new(first),
+                    count: Box::new(count),
+                }))
+            }
+            TokenKind::Comma => {
+                self.bump();
+                let mut elems = vec![first];
+                while !matches!(self.peek(), TokenKind::RBracket | TokenKind::Eof) {
+                    let elem = self.parse_expr()?;
+                    elems.push(elem);
+                    if matches!(self.peek(), TokenKind::Comma) {
+                        self.bump();
+                    } else {
+                        break;
+                    }
+                }
+                let rbracket_tok = self.expect(&TokenKind::RBracket)?;
+                let id = self.new_node_id();
+                Ok(Expr::ArrayLit(ArrayLit {
+                    id,
+                    span: lbracket_span.merge(&rbracket_tok.span),
+                    elems,
+                }))
+            }
+            TokenKind::RBracket => {
+                let rbracket_tok = self.bump();
+                let id = self.new_node_id();
+                Ok(Expr::ArrayLit(ArrayLit {
+                    id,
+                    span: lbracket_span.merge(&rbracket_tok.span),
+                    elems: vec![first],
+                }))
+            }
+            _ => Err(self.unexpected_token_error("`,`, `;`, or `]`")),
         }
     }
 
@@ -566,6 +631,7 @@ impl Parser {
             TokenKind::CharLiteral(_) => self.parse_char_lit(),
             TokenKind::StringLiteral(_) | TokenKind::RawStringLiteral(_) => self.parse_str_lit(),
             TokenKind::True | TokenKind::False => self.parse_bool_lit(),
+            TokenKind::LBracket => self.parse_array_literal(),
             _ => Err(self.unexpected_token_error("expression")),
         }
     }
@@ -1768,6 +1834,119 @@ mod tests {
             Err(e) => assert_eq!(e.code, ErrorCode::E0100),
             Ok(other) => panic!("expected Err(E0100) for `| 1i32`, got Ok({:?})", other),
         }
+    }
+
+    #[test]
+    fn array_literal_and_repeat() {
+        // []
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBracket),
+            tok(TokenKind::RBracket),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::ArrayLit(a)) => assert_eq!(a.elems.len(), 0),
+            other => panic!("expected ArrayLit for `[]`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 2);
+        assert!(p.errors.is_empty());
+
+        // [1i32]
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBracket),
+            int_tok(1),
+            tok(TokenKind::RBracket),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::ArrayLit(a)) => {
+                assert_eq!(a.elems.len(), 1);
+                assert_eq!(int_value(&a.elems[0]), 1);
+            }
+            other => panic!("expected ArrayLit for `[1i32]`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 3);
+        assert!(p.errors.is_empty());
+
+        // [1i32, 2i32, 3i32]
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBracket),
+            int_tok(1),
+            tok(TokenKind::Comma),
+            int_tok(2),
+            tok(TokenKind::Comma),
+            int_tok(3),
+            tok(TokenKind::RBracket),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::ArrayLit(a)) => {
+                assert_eq!(a.elems.len(), 3);
+                assert_eq!(int_value(&a.elems[0]), 1);
+                assert_eq!(int_value(&a.elems[1]), 2);
+                assert_eq!(int_value(&a.elems[2]), 3);
+            }
+            other => panic!(
+                "expected ArrayLit for `[1i32, 2i32, 3i32]`, got {:?}",
+                other
+            ),
+        }
+        assert_eq!(p.pos, 7);
+        assert!(p.errors.is_empty());
+
+        // [1i32, 2i32,]  (trailing comma)
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBracket),
+            int_tok(1),
+            tok(TokenKind::Comma),
+            int_tok(2),
+            tok(TokenKind::Comma),
+            tok(TokenKind::RBracket),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::ArrayLit(a)) => {
+                assert_eq!(a.elems.len(), 2);
+                assert_eq!(int_value(&a.elems[0]), 1);
+                assert_eq!(int_value(&a.elems[1]), 2);
+            }
+            other => panic!("expected ArrayLit for `[1i32, 2i32,]`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 6);
+        assert!(p.errors.is_empty());
+
+        // [0i32; 4i32]
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBracket),
+            int_tok(0),
+            tok(TokenKind::Semi),
+            int_tok(4),
+            tok(TokenKind::RBracket),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::ArrayRepeat(r)) => {
+                match *r.value {
+                    Expr::IntLit(lit) => assert_eq!(lit.value, 0),
+                    other => panic!("expected IntLit value, got {:?}", other),
+                }
+                match *r.count {
+                    Expr::IntLit(lit) => assert_eq!(lit.value, 4),
+                    other => panic!("expected IntLit count, got {:?}", other),
+                }
+            }
+            other => panic!("expected ArrayRepeat for `[0i32; 4i32]`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 5);
+        assert!(p.errors.is_empty());
+
+        // [1i32 (missing `]`) → Err
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBracket),
+            int_tok(1),
+            tok(TokenKind::Eof),
+        ]);
+        assert!(p.parse_expr().is_err());
     }
 
     #[test]
