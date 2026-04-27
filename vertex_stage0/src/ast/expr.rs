@@ -74,6 +74,27 @@ pub enum CastTy {
     Placeholder,
 }
 
+// TODO: replaced by define-pattern-enum-in-src-ast-pat-rs
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub enum ClosureParam {
+    Placeholder,
+}
+
+// TODO: replaced by define-stmt-enum-in-src-ast-stmt-rs
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub enum Stmt {
+    Placeholder,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct StructLitField {
+    pub name: String,
+    pub value: Expr,
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnaryOp {
@@ -199,6 +220,70 @@ pub struct Try {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
+pub struct Range {
+    pub id: NodeId,
+    pub span: Span,
+    pub start: Option<Box<Expr>>,
+    pub end: Option<Box<Expr>>,
+    pub inclusive: bool,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct Closure {
+    pub id: NodeId,
+    pub span: Span,
+    pub params: Vec<ClosureParam>,
+    pub body: Box<Expr>,
+    pub move_kw: bool,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct StructLit {
+    pub id: NodeId,
+    pub span: Span,
+    pub path: Path,
+    pub fields: Vec<StructLitField>,
+    pub base: Option<Box<Expr>>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct TupleLit {
+    pub id: NodeId,
+    pub span: Span,
+    pub elems: Vec<Expr>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct ArrayLit {
+    pub id: NodeId,
+    pub span: Span,
+    pub elems: Vec<Expr>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct ArrayRepeat {
+    pub id: NodeId,
+    pub span: Span,
+    pub value: Box<Expr>,
+    pub count: Box<Expr>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct Block {
+    pub id: NodeId,
+    pub span: Span,
+    pub stmts: Vec<Stmt>,
+    pub tail: Option<Box<Expr>>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     IntLit(IntLit),
     FloatLit(FloatLit),
@@ -215,6 +300,13 @@ pub enum Expr {
     Index(Index),
     Cast(Cast),
     Try(Try),
+    Range(Range),
+    Closure(Closure),
+    StructLit(StructLit),
+    TupleLit(TupleLit),
+    ArrayLit(ArrayLit),
+    ArrayRepeat(ArrayRepeat),
+    Block(Block),
 }
 
 impl Expr {
@@ -235,6 +327,13 @@ impl Expr {
             Expr::Index(e) => e.id,
             Expr::Cast(e) => e.id,
             Expr::Try(e) => e.id,
+            Expr::Range(e) => e.id,
+            Expr::Closure(e) => e.id,
+            Expr::StructLit(e) => e.id,
+            Expr::TupleLit(e) => e.id,
+            Expr::ArrayLit(e) => e.id,
+            Expr::ArrayRepeat(e) => e.id,
+            Expr::Block(e) => e.id,
         }
     }
 
@@ -255,6 +354,13 @@ impl Expr {
             Expr::Index(e) => e.span,
             Expr::Cast(e) => e.span,
             Expr::Try(e) => e.span,
+            Expr::Range(e) => e.span,
+            Expr::Closure(e) => e.span,
+            Expr::StructLit(e) => e.span,
+            Expr::TupleLit(e) => e.span,
+            Expr::ArrayLit(e) => e.span,
+            Expr::ArrayRepeat(e) => e.span,
+            Expr::Block(e) => e.span,
         }
     }
 }

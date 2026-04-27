@@ -272,7 +272,7 @@
   - [ ] `Unary { op, operand }, Binary { op, lhs, rhs }, Call { callee, args }, MethodCall { receiver, method, args, generic_args }, Field { receiver, name }, TupleField { receiver, idx }, Index { receiver, idx }, Cast { expr, ty }, Try { expr }`
   - [ ] **Verify:** `cargo build`
 
-- [ ] Add aggregate + literal-construction variants to `Expr`
+- [x] Add aggregate + literal-construction variants to `Expr`
   - [ ] `Range { start, end, inclusive }, Closure { params, body, move_kw }, StructLit { path, fields, base }, TupleLit { elems }, ArrayLit { elems }, ArrayRepeat { value, count }, Block { stmts, tail }`
   - [ ] **Verify:** `cargo build`
 
