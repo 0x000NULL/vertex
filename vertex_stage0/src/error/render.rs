@@ -15,8 +15,8 @@ pub fn render(err: &CompileError, src: &SourceMap) -> String {
         None => (err.span, ""),
     };
 
-    let file = src.file(primary_span.file);
-    let (line, col) = src.line_col(primary_span.file, primary_span.start);
+    let file = src.file(primary_span.file_id);
+    let (line, col) = src.line_col(primary_span.file_id, primary_span.start);
     let _ = writeln!(out, "  --> {}:{}:{}", file.name.display(), line, col);
 
     let line_idx = (line - 1) as usize;
@@ -51,8 +51,8 @@ pub fn render(err: &CompileError, src: &SourceMap) -> String {
         if Some(i) == primary_idx {
             continue;
         }
-        let lf = src.file(label.span.file);
-        let (lline, lcol) = src.line_col(label.span.file, label.span.start);
+        let lf = src.file(label.span.file_id);
+        let (lline, lcol) = src.line_col(label.span.file_id, label.span.start);
         let _ = writeln!(
             out,
             "  ::: {}:{}:{}: {}",

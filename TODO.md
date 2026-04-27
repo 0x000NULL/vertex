@@ -56,7 +56,7 @@
   - [ ] `pub struct FileId(pub u32);` with `Copy, Clone, PartialEq, Eq, Hash, Debug`
   - [ ] **Verify:** `cargo build`; `grep -q 'pub struct FileId' src/span.rs`
 
-- [ ] Implement `Span` struct in `src/span.rs`
+- [x] Implement `Span` struct in `src/span.rs`
   - [ ] Fields: `file_id: FileId`, `start: u32`, `end: u32`
   - [ ] Methods: `pub fn new(file_id, start, end)`, `pub fn len(&self)`, `pub fn merge(&self, other: &Span) -> Span`
   - [ ] Derives: `Copy, Clone, PartialEq, Eq, Debug`

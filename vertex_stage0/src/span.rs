@@ -5,14 +5,30 @@ pub struct FileId(pub u32);
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Span {
-    pub file: FileId,
+    pub file_id: FileId,
     pub start: u32,
     pub end: u32,
 }
 
 impl Span {
-    pub fn new(file: FileId, start: u32, end: u32) -> Span {
-        Span { file, start, end }
+    pub fn new(file_id: FileId, start: u32, end: u32) -> Span {
+        Span {
+            file_id,
+            start,
+            end,
+        }
+    }
+
+    pub fn len(&self) -> u32 {
+        self.end - self.start
+    }
+
+    pub fn merge(&self, other: &Span) -> Span {
+        Span {
+            file_id: self.file_id,
+            start: self.start.min(other.start),
+            end: self.end.max(other.end),
+        }
     }
 }
 
@@ -63,7 +79,7 @@ impl SourceMap {
     }
 
     pub fn snippet(&self, span: Span) -> &str {
-        &self.file(span.file).content[span.start as usize..span.end as usize]
+        &self.file(span.file_id).content[span.start as usize..span.end as usize]
     }
 
     pub fn line_col(&self, file: FileId, byte_offset: u32) -> (u32, u32) {
@@ -98,6 +114,29 @@ mod tests {
         assert_eq!(map.line_col(utf8_id, 2), (1, 2));
         assert_eq!(map.line_col(utf8_id, 5), (2, 1));
         assert_eq!(map.line_col(utf8_id, 9), (2, 3));
+    }
+
+    #[test]
+    fn span_merge_takes_outer_bounds() {
+        let file_id = FileId(0);
+
+        let a = Span::new(file_id, 5, 10);
+        let b = Span::new(file_id, 8, 15);
+        let merged = a.merge(&b);
+        assert_eq!(merged.file_id, file_id);
+        assert_eq!(merged.start, 5);
+        assert_eq!(merged.end, 15);
+        assert_eq!(merged.len(), merged.end - merged.start);
+
+        assert_eq!(a.merge(&b), b.merge(&a));
+
+        let c = Span::new(file_id, 20, 25);
+        let disjoint = a.merge(&c);
+        assert_eq!(disjoint.file_id, file_id);
+        assert_eq!(disjoint.start, 5);
+        assert_eq!(disjoint.end, 25);
+        assert_eq!(disjoint.len(), 20);
+        assert_eq!(a.merge(&c), c.merge(&a));
     }
 
     #[test]
