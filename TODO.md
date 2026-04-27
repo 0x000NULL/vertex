@@ -327,7 +327,7 @@
   - [ ] Disambiguate `(expr)` vs `(a, b)` vs `(x,)` vs `()`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::paren_tuple_unit`
 
-- [ ] Parse unary prefix expressions
+- [x] Parse unary prefix expressions
   - [ ] `-`, `not`, `*` (deref), `&`, `&mut`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::unary_prefix`
 

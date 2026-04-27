@@ -371,3 +371,9 @@
       infra-error: API Error: Stream idle timeout - partial response received
     [4/72] parse-path-expressions: phase-2 infra-error
 ==> plan  parse-parenthesized-tuple-unit
+      plan: 110.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-parenthesized-tuple-unit-plan-20260427T053031905.txt
+==> exec  parse-parenthesized-tuple-unit
+      exec: 97.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-parenthesized-tuple-unit-execute-20260427T053208934.txt
+      notes: - The plan said "save `lparen_span = tok.span`" but did not pre-name the bumped variable; I named it `lparen_tok` (parallel to `rparen_tok` used later) before reading `.span`. / - For the `Comma` branch the plan referenced `rparen_span` but did not name the binding for the result of `expect(&TokenKind::RParen)?`; I bound it to `rparen_tok` and read `.span`. `expect` returns `Result<Token, CompileError>` per `parser/mod.rs`, so this is the natural plumbing.
+    [5/72] parse-parenthesized-tuple-unit: plan $0.66 / execute $0.68 / verified / committed 8602aca
+==> plan  parse-unary-prefix-expressions

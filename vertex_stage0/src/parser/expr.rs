@@ -1,4 +1,4 @@
-use crate::ast::expr::{BoolLit, CharLit, Expr, FloatLit, IntLit, StrLit, TupleLit};
+use crate::ast::expr::{BoolLit, CharLit, Expr, FloatLit, IntLit, StrLit, TupleLit, Unary, UnaryOp};
 use crate::error::{CompileError, ErrorCode, ErrorKind};
 use crate::lexer::token::TokenKind;
 use crate::parser::Parser;
@@ -132,6 +132,49 @@ impl Parser {
             }
             _ => Err(self.unexpected_token_error("`,` or `)`")),
         }
+    }
+
+    pub fn parse_unary(&mut self) -> Result<Expr, CompileError> {
+        let op_span = if self.pos < self.tokens.len() {
+            self.tokens[self.pos].span
+        } else if let Some(last) = self.tokens.last() {
+            last.span
+        } else {
+            crate::span::Span::new(crate::span::FileId(0), 0, 0)
+        };
+        let op = match self.peek() {
+            TokenKind::Minus => {
+                self.bump();
+                UnaryOp::Neg
+            }
+            TokenKind::Not => {
+                self.bump();
+                UnaryOp::Not
+            }
+            TokenKind::Star => {
+                self.bump();
+                UnaryOp::Deref
+            }
+            TokenKind::Amp => {
+                self.bump();
+                if matches!(self.peek(), TokenKind::Mut) {
+                    self.bump();
+                    UnaryOp::RefMut
+                } else {
+                    UnaryOp::Ref
+                }
+            }
+            _ => return self.parse_primary_for_paren(),
+        };
+        let operand = self.parse_unary()?;
+        let span = op_span.merge(&operand.span());
+        let id = self.new_node_id();
+        Ok(Expr::Unary(Unary {
+            id,
+            span,
+            op,
+            operand: Box::new(operand),
+        }))
     }
 
     // Temporary stub: only handles literal heads. Will be replaced by
@@ -381,5 +424,176 @@ mod tests {
         assert!(p.parse_paren_or_tuple().is_err());
         assert_eq!(p.pos, 0);
         assert!(p.errors.is_empty());
+    }
+
+    #[test]
+    fn unary_prefix() {
+        // -7i32
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Minus),
+            tok(TokenKind::IntLiteral(7, IntSuffix::I32)),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Ok(Expr::Unary(u)) => {
+                assert_eq!(u.op, UnaryOp::Neg);
+                match *u.operand {
+                    Expr::IntLit(lit) => {
+                        assert_eq!(lit.value, 7);
+                        assert_eq!(lit.suffix, IntSuffix::I32);
+                    }
+                    other => panic!("expected IntLit operand, got {:?}", other),
+                }
+            }
+            other => panic!("expected Ok(Unary(Neg, IntLit)) for `-7i32`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 2);
+        assert!(p.errors.is_empty());
+
+        // not true
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Not),
+            tok(TokenKind::True),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Ok(Expr::Unary(u)) => {
+                assert_eq!(u.op, UnaryOp::Not);
+                match *u.operand {
+                    Expr::BoolLit(lit) => assert!(lit.value),
+                    other => panic!("expected BoolLit operand, got {:?}", other),
+                }
+            }
+            other => panic!("expected Ok(Unary(Not, BoolLit)) for `not true`, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+
+        // *1i32
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Star),
+            tok(TokenKind::IntLiteral(1, IntSuffix::I32)),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Ok(Expr::Unary(u)) => {
+                assert_eq!(u.op, UnaryOp::Deref);
+                match *u.operand {
+                    Expr::IntLit(lit) => assert_eq!(lit.value, 1),
+                    other => panic!("expected IntLit operand, got {:?}", other),
+                }
+            }
+            other => panic!("expected Ok(Unary(Deref, IntLit)) for `*1i32`, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+
+        // &1i32
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Amp),
+            tok(TokenKind::IntLiteral(1, IntSuffix::I32)),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Ok(Expr::Unary(u)) => {
+                assert_eq!(u.op, UnaryOp::Ref);
+                match *u.operand {
+                    Expr::IntLit(lit) => assert_eq!(lit.value, 1),
+                    other => panic!("expected IntLit operand, got {:?}", other),
+                }
+            }
+            other => panic!("expected Ok(Unary(Ref, IntLit)) for `&1i32`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 2);
+        assert!(p.errors.is_empty());
+
+        // &mut 1i32
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Amp),
+            tok(TokenKind::Mut),
+            tok(TokenKind::IntLiteral(1, IntSuffix::I32)),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Ok(Expr::Unary(u)) => {
+                assert_eq!(u.op, UnaryOp::RefMut);
+                match *u.operand {
+                    Expr::IntLit(lit) => assert_eq!(lit.value, 1),
+                    other => panic!("expected IntLit operand, got {:?}", other),
+                }
+            }
+            other => panic!("expected Ok(Unary(RefMut, IntLit)) for `&mut 1i32`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 3);
+        assert!(p.errors.is_empty());
+
+        // - - 7i32 (chained, depth 2)
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Minus),
+            tok(TokenKind::Minus),
+            tok(TokenKind::IntLiteral(7, IntSuffix::I32)),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Ok(Expr::Unary(outer)) => {
+                assert_eq!(outer.op, UnaryOp::Neg);
+                match *outer.operand {
+                    Expr::Unary(inner) => {
+                        assert_eq!(inner.op, UnaryOp::Neg);
+                        match *inner.operand {
+                            Expr::IntLit(lit) => assert_eq!(lit.value, 7),
+                            other => panic!("expected IntLit at depth 2, got {:?}", other),
+                        }
+                    }
+                    other => panic!("expected inner Unary(Neg), got {:?}", other),
+                }
+            }
+            other => panic!("expected Ok(Unary(Neg, Unary(Neg, _))) for `- - 7i32`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 3);
+        assert!(p.errors.is_empty());
+
+        // & * 1i32
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Amp),
+            tok(TokenKind::Star),
+            tok(TokenKind::IntLiteral(1, IntSuffix::I32)),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Ok(Expr::Unary(outer)) => {
+                assert_eq!(outer.op, UnaryOp::Ref);
+                match *outer.operand {
+                    Expr::Unary(inner) => {
+                        assert_eq!(inner.op, UnaryOp::Deref);
+                        match *inner.operand {
+                            Expr::IntLit(lit) => assert_eq!(lit.value, 1),
+                            other => panic!("expected IntLit, got {:?}", other),
+                        }
+                    }
+                    other => panic!("expected inner Unary(Deref), got {:?}", other),
+                }
+            }
+            other => panic!("expected Ok(Unary(Ref, Unary(Deref, _))) for `& * 1i32`, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+
+        // pass-through: literal head returns Expr::IntLit directly
+        let mut p = Parser::new(vec![
+            tok(TokenKind::IntLiteral(42, IntSuffix::I32)),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_unary() {
+            Ok(Expr::IntLit(lit)) => {
+                assert_eq!(lit.value, 42);
+                assert_eq!(lit.suffix, IntSuffix::I32);
+            }
+            other => panic!("expected Ok(IntLit) pass-through, got {:?}", other),
+        }
+        assert_eq!(p.pos, 1);
+        assert!(p.errors.is_empty());
+
+        // wrong head: [Plus, Eof] → Err, pos == 0
+        let mut p = Parser::new(vec![tok(TokenKind::Plus), tok(TokenKind::Eof)]);
+        assert!(p.parse_unary().is_err());
+        assert_eq!(p.pos, 0);
     }
 }
