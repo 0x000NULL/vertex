@@ -344,7 +344,7 @@
   - [ ] `x[i]`, `x as T`, `x?`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::index_cast_try`
 
-- [ ] Parse range expressions
+- [x] Parse range expressions
   - [ ] `a..b`, `a..=b`, `a..`, `..b`, `..`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::range_forms`
 

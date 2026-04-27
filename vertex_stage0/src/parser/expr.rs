@@ -1,6 +1,6 @@
 use crate::ast::expr::{
     Binary, BinaryOp, BoolLit, Call, Cast, CastTy, CharLit, Expr, FieldAccess, FloatLit, Index,
-    IntLit, MethodCall, StrLit, Try, TupleFieldAccess, TupleLit, Unary, UnaryOp,
+    IntLit, MethodCall, Range, StrLit, Try, TupleFieldAccess, TupleLit, Unary, UnaryOp,
 };
 use crate::error::{CompileError, ErrorCode, ErrorKind};
 use crate::lexer::token::TokenKind;
@@ -145,7 +145,69 @@ impl Parser {
     }
 
     pub fn parse_expr(&mut self) -> Result<Expr, CompileError> {
-        self.parse_binary(0)
+        self.parse_range()
+    }
+
+    fn parse_range(&mut self) -> Result<Expr, CompileError> {
+        // Prefix range: `..` or `..=` with optional RHS.
+        if matches!(self.peek(), TokenKind::DotDot | TokenKind::DotDotEq) {
+            let inclusive = matches!(self.peek(), TokenKind::DotDotEq);
+            let op_tok = self.bump();
+            let op_span = op_tok.span;
+            if range_rhs_starts_here(self.peek()) {
+                let end = self.parse_binary(0)?;
+                let span = op_span.merge(&end.span());
+                let id = self.new_node_id();
+                return Ok(Expr::Range(Range {
+                    id,
+                    span,
+                    start: None,
+                    end: Some(Box::new(end)),
+                    inclusive,
+                }));
+            } else {
+                let id = self.new_node_id();
+                return Ok(Expr::Range(Range {
+                    id,
+                    span: op_span,
+                    start: None,
+                    end: None,
+                    inclusive,
+                }));
+            }
+        }
+
+        // Infix range: LHS [`..` | `..=` [RHS]]?
+        let lhs = self.parse_binary(0)?;
+        if matches!(self.peek(), TokenKind::DotDot | TokenKind::DotDotEq) {
+            let inclusive = matches!(self.peek(), TokenKind::DotDotEq);
+            let op_tok = self.bump();
+            let op_span = op_tok.span;
+            if range_rhs_starts_here(self.peek()) {
+                let end = self.parse_binary(0)?;
+                let span = lhs.span().merge(&end.span());
+                let id = self.new_node_id();
+                Ok(Expr::Range(Range {
+                    id,
+                    span,
+                    start: Some(Box::new(lhs)),
+                    end: Some(Box::new(end)),
+                    inclusive,
+                }))
+            } else {
+                let span = lhs.span().merge(&op_span);
+                let id = self.new_node_id();
+                Ok(Expr::Range(Range {
+                    id,
+                    span,
+                    start: Some(Box::new(lhs)),
+                    end: None,
+                    inclusive,
+                }))
+            }
+        } else {
+            Ok(lhs)
+        }
     }
 
     fn parse_binary(&mut self, min_bp: u8) -> Result<Expr, CompileError> {
@@ -418,6 +480,27 @@ impl Parser {
         );
         CompileError::new(ErrorCode::E0100, ErrorKind::Syntax, span, message)
     }
+}
+
+// TODO: extend this set when `Ident`/`If`/`Match`/`Loop`/`Block`/`[`/path heads
+// become valid expression starters; otherwise `a.. <new-form>` will be misparsed
+// as `a..` followed by stray tokens.
+fn range_rhs_starts_here(kind: &TokenKind) -> bool {
+    matches!(
+        kind,
+        TokenKind::IntLiteral(_, _)
+            | TokenKind::FloatLiteral(_, _)
+            | TokenKind::CharLiteral(_)
+            | TokenKind::StringLiteral(_)
+            | TokenKind::RawStringLiteral(_)
+            | TokenKind::True
+            | TokenKind::False
+            | TokenKind::LParen
+            | TokenKind::Minus
+            | TokenKind::Not
+            | TokenKind::Star
+            | TokenKind::Amp
+    )
 }
 
 fn is_comparison_op(op: BinaryOp) -> bool {
@@ -1348,6 +1431,98 @@ mod tests {
             Err(e) => assert_eq!(e.code, ErrorCode::E0100),
             Ok(other) => panic!("expected Err(E0100) for `42[1`, got Ok({:?})", other),
         }
+    }
+
+    #[test]
+    fn range_forms() {
+        // 1i32 .. 2i32  → Range(Some(1), Some(2), inclusive=false)
+        let mut p = Parser::new(vec![
+            int_tok(1),
+            tok(TokenKind::DotDot),
+            int_tok(2),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Range(r)) => {
+                assert!(!r.inclusive);
+                let s = r.start.expect("start");
+                assert_eq!(int_value(&s), 1);
+                let e = r.end.expect("end");
+                assert_eq!(int_value(&e), 2);
+            }
+            other => panic!("expected Range for `1..2`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 3);
+        assert!(p.errors.is_empty());
+
+        // 1i32 ..= 2i32  → Range(Some(1), Some(2), inclusive=true)
+        let mut p = Parser::new(vec![
+            int_tok(1),
+            tok(TokenKind::DotDotEq),
+            int_tok(2),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Range(r)) => {
+                assert!(r.inclusive);
+                let s = r.start.expect("start");
+                assert_eq!(int_value(&s), 1);
+                let e = r.end.expect("end");
+                assert_eq!(int_value(&e), 2);
+            }
+            other => panic!("expected Range for `1..=2`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 3);
+        assert!(p.errors.is_empty());
+
+        // 1i32 ..  → Range(Some(1), None, inclusive=false)
+        let mut p = Parser::new(vec![
+            int_tok(1),
+            tok(TokenKind::DotDot),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Range(r)) => {
+                assert!(!r.inclusive);
+                let s = r.start.expect("start");
+                assert_eq!(int_value(&s), 1);
+                assert!(r.end.is_none());
+            }
+            other => panic!("expected Range for `1..`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 2);
+        assert!(p.errors.is_empty());
+
+        // .. 2i32  → Range(None, Some(2), inclusive=false)
+        let mut p = Parser::new(vec![
+            tok(TokenKind::DotDot),
+            int_tok(2),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Range(r)) => {
+                assert!(!r.inclusive);
+                assert!(r.start.is_none());
+                let e = r.end.expect("end");
+                assert_eq!(int_value(&e), 2);
+            }
+            other => panic!("expected Range for `..2`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 2);
+        assert!(p.errors.is_empty());
+
+        // ..  → Range(None, None, inclusive=false)
+        let mut p = Parser::new(vec![tok(TokenKind::DotDot), tok(TokenKind::Eof)]);
+        match p.parse_expr() {
+            Ok(Expr::Range(r)) => {
+                assert!(!r.inclusive);
+                assert!(r.start.is_none());
+                assert!(r.end.is_none());
+            }
+            other => panic!("expected Range for `..`, got {:?}", other),
+        }
+        assert_eq!(p.pos, 1);
+        assert!(p.errors.is_empty());
     }
 
     #[test]

@@ -395,3 +395,11 @@
       notes: - The plan's chain test specified token sequence `IntLit(42), Dot, Ident("foo"), LParen, RParen, Dot, Ident("bar"), Dot, IntLit(0, Unsuffixed)` — I included a trailing `Eof` token (consistent with sibling tests) so `pos == 9` after parsing the 9 non-Eof tokens. / - The plan said "Span captured before `bump`" — for the `(...)` and method-call `(...)` rparen spans I used `rparen_tok.span` from the token returned by `expect`, which is equivalent (the token clone retains the span); for ident and int-literal RHS of `.` I capture `self.tokens[self.pos].span` before `bump` per the plan's pattern.
     [8/72] parse-function-call-method-call-field-access: plan $1.27 / execute $0.93 / verified / committed 96fd0d6
 ==> plan  parse-indexing-cast-try
+      plan: 192.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-indexing-cast-try-plan-20260427T055320156.txt
+==> exec  parse-indexing-cast-try
+      exec: 188.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-indexing-cast-try-execute-20260427T055628205.txt
+      notes: - The plan said "replace the two `self.parse_unary()` calls" in `parse_binary` (line 152 lhs and line 185 recursive rhs), but the function only has **one** `self.parse_unary()` call (line 152). Line 185 is `self.parse_binary(right_bp)` (a recursive call), which automatically routes through the new `parse_cast` after the line-152 swap — so I made only the one swap. Net behavior matches the plan's stated `unary > as > * / %` precedence (verified by the `- 7i32 as i32` test). / - The plan's `- x as i32` test case uses `x` as a stand-in for an arbitrary unary operand. Since `parse_primary_for_paren` is still a literal-only stub (no `Ident` head support), I substituted an `IntLit` (`7i32`) for `x`. The test still confirms the desired `(-x) as T` precedence.
+    [9/72] parse-indexing-cast-try: plan $1.04 / execute $1.12 / verified / committed 0fdbd49
+==> plan  parse-range-expressions
+      plan: 197.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-range-expressions-plan-20260427T055946626.txt
+==> exec  parse-range-expressions
