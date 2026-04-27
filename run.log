@@ -94,3 +94,7 @@
       notes: - Suffix matching was factored into a private helper `scan_int_suffix` to keep `scan_int_decimal` readable; this is internal and does not change the plan's external surface (only `scan_int_decimal` is `pub`). / - Step 3 offered "small `String` accumulator" or "fold into `u64` directly via `checked_*`" — chose the direct `checked_*` fold (avoids an allocation, and the plan calls out this option explicitly).
     [13/113] implement-decimal-int-literal-scanning: plan $0.32 / execute $0.40 / verified / committed 27c955f
 ==> plan  implement-hex-0x-and-binary-0b-int-literal-scanning
+      plan: 79.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-hex-0x-and-binary-0b-int-literal-scanning-plan-20260427T031557189.txt
+==> exec  implement-hex-0x-and-binary-0b-int-literal-scanning
+      exec: 107.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-hex-0x-and-binary-0b-int-literal-scanning-execute-20260427T031744233.txt
+      notes: - Placed `hex_digit_value` as a private module-level free function (rather than a `Scanner` associated function) since it does not touch scanner state — keeps the impl block focused on cursor/scanning methods. / - Test uses `FileId(3)` for happy-path cases (distinct from the decimal test's `FileId(7)`) and `FileId(0)` for rejection cases; nothing in the plan dictated a specific id, so I picked arbitrary non-zero/zero ids that exercise the field without colliding.

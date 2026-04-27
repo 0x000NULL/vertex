@@ -157,7 +157,7 @@
   - [ ] Handle `_` separators; reject empty digit run after prefix
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::hex_and_bin_literals`
 
-- [ ] Implement float literal scanning
+- [x] Implement float literal scanning
   - [ ] Method `Scanner::scan_float` handling `1.0`, `1.0e10`, `1.0E-3`, `.5` (rejected per spec — must have leading digit), `f32`/`f64` suffix
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::float_literal_forms`
 

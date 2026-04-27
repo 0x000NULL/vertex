@@ -1,3 +1,4 @@
+use crate::lexer::token::FloatSuffix;
 use crate::lexer::token::IntSuffix;
 use crate::span::FileId;
 use crate::span::Span;
@@ -172,6 +173,110 @@ impl<'a> Scanner<'a> {
         Some((value, suffix, Span::new(self.file_id, start, end)))
     }
 
+    pub fn scan_float(&mut self) -> Option<(f64, FloatSuffix, Span)> {
+        let start = self.pos;
+
+        match self.peek() {
+            Some(b) if b.is_ascii_digit() => {}
+            _ => return None,
+        }
+
+        let mut buf = String::new();
+
+        while let Some(b) = self.peek() {
+            if b.is_ascii_digit() {
+                buf.push(b as char);
+                self.pos += 1;
+            } else if b == b'_' {
+                self.pos += 1;
+            } else {
+                break;
+            }
+        }
+
+        let dot_followed_by_digit = self.peek_at(0) == Some(b'.')
+            && self.peek_at(1).map_or(false, |b| b.is_ascii_digit());
+        if !dot_followed_by_digit {
+            self.pos = start;
+            return None;
+        }
+
+        buf.push('.');
+        self.pos += 1;
+
+        while let Some(b) = self.peek() {
+            if b.is_ascii_digit() {
+                buf.push(b as char);
+                self.pos += 1;
+            } else if b == b'_' {
+                self.pos += 1;
+            } else {
+                break;
+            }
+        }
+
+        if let Some(b) = self.peek() {
+            if b == b'e' || b == b'E' {
+                buf.push('e');
+                self.pos += 1;
+
+                if let Some(sign) = self.peek() {
+                    if sign == b'+' || sign == b'-' {
+                        buf.push(sign as char);
+                        self.pos += 1;
+                    }
+                }
+
+                let mut saw_exp_digit = false;
+                while let Some(b) = self.peek() {
+                    if b.is_ascii_digit() {
+                        saw_exp_digit = true;
+                        buf.push(b as char);
+                        self.pos += 1;
+                    } else if b == b'_' {
+                        self.pos += 1;
+                    } else {
+                        break;
+                    }
+                }
+
+                if !saw_exp_digit {
+                    self.pos = start;
+                    return None;
+                }
+            }
+        }
+
+        let suffix = self.scan_float_suffix();
+
+        let value = match <f64 as core::str::FromStr>::from_str(&buf) {
+            Ok(v) => v,
+            Err(_) => {
+                self.pos = start;
+                return None;
+            }
+        };
+
+        let span = Span::new(self.file_id, start as u32, self.pos as u32);
+        Some((value, suffix, span))
+    }
+
+    fn scan_float_suffix(&mut self) -> FloatSuffix {
+        if self.peek() != Some(b'f') {
+            return FloatSuffix::Unsuffixed;
+        }
+        let rest = &self.bytes[self.pos..];
+        if rest.starts_with(b"f32") {
+            self.pos += 3;
+            FloatSuffix::F32
+        } else if rest.starts_with(b"f64") {
+            self.pos += 3;
+            FloatSuffix::F64
+        } else {
+            FloatSuffix::Unsuffixed
+        }
+    }
+
     fn scan_int_suffix(&mut self) -> IntSuffix {
         const SUFFIXES: &[(&[u8], IntSuffix)] = &[
             (b"isize", IntSuffix::ISize),
@@ -322,6 +427,42 @@ mod tests {
         let (value, suffix, _) = overflow.scan_int_hex().expect("overflow input");
         assert_eq!(value, u64::MAX);
         assert_eq!(suffix, IntSuffix::Unsuffixed);
+    }
+
+    #[test]
+    fn float_literal_forms() {
+        let happy: &[(&str, f64, FloatSuffix)] = &[
+            ("1.0", 1.0, FloatSuffix::Unsuffixed),
+            ("1.0e10", 1.0e10, FloatSuffix::Unsuffixed),
+            ("1.0E-3", 1.0e-3, FloatSuffix::Unsuffixed),
+            ("3.14f32", 3.14, FloatSuffix::F32),
+            ("2.5f64", 2.5, FloatSuffix::F64),
+            ("1_000.000_5", 1000.0005, FloatSuffix::Unsuffixed),
+            ("1.0e+2", 100.0, FloatSuffix::Unsuffixed),
+        ];
+
+        for (input, expected_value, expected_suffix) in happy {
+            let mut s = Scanner::new(input, FileId(5));
+            let (value, suffix, span) = s.scan_float().expect(input);
+            assert!(
+                (value - *expected_value).abs() < 1e-12,
+                "value for {:?}: got {}, expected {}",
+                input,
+                value,
+                expected_value
+            );
+            assert_eq!(suffix, *expected_suffix, "suffix for {:?}", input);
+            assert_eq!(span.file_id, FileId(5), "file_id for {:?}", input);
+            assert_eq!(span.start, 0, "span.start for {:?}", input);
+            assert_eq!(span.end as usize, input.len(), "span.end for {:?}", input);
+            assert_eq!(s.pos, input.len(), "pos for {:?}", input);
+        }
+
+        for input in &[".5", "1", "1.0e"] {
+            let mut s = Scanner::new(input, FileId(0));
+            assert!(s.scan_float().is_none(), "expected None for {:?}", input);
+            assert_eq!(s.pos, 0, "expected pos=0 after rejecting {:?}", input);
+        }
     }
 
     #[test]
