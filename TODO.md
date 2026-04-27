@@ -300,7 +300,7 @@
 
 ## 8. Parser foundation
 
-- [ ] Implement `Parser` struct in `src/parser/mod.rs`
+- [x] Implement `Parser` struct in `src/parser/mod.rs`
   - [ ] Fields: `tokens: Vec<Token>`, `pos: usize`, `errors: ErrorAccumulator`
   - [ ] Methods: `pub fn new(tokens)`, `peek`, `peek_at`, `bump`, `eat`, `expect`
   - [ ] `eat(kind) -> bool` (advance if match), `expect(kind) -> Result<Token, CompileError>`

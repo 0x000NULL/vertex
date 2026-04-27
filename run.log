@@ -251,3 +251,7 @@
       notes: - No ambiguities required conservative interpretation; the plan's specs and assumptions were followed verbatim. Variant field ordering inside `Ref` matches the plan order (`mutable, ty, span, id`).
     [39/113] define-type-enum-in-src-ast-ty-rs: plan $0.68 / execute $0.27 / verified / committed b7d6421
 ==> plan  define-pattern-enum-in-src-ast-pat-rs
+      plan: 102.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-pattern-enum-in-src-ast-pat-rs-plan-20260427T042844186.txt
+==> exec  define-pattern-enum-in-src-ast-pat-rs
+      exec: 51.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-pattern-enum-in-src-ast-pat-rs-execute-20260427T042935228.txt
+      notes: - For the local `Lit` enum, used variant names `Int`/`Float`/`Char`/`Str`/`Bool` wrapping the existing per-kind structs (`IntLit`, `FloatLit`, `CharLit`, `StrLit`, `BoolLit`) from `ast::expr` — the spec didn't pin a naming, so I followed the shortest unambiguous form. / - `Pattern::Range` bounds typed as `Box<Pattern>` per the plan's "most flexible" guidance.

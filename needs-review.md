@@ -147,3 +147,18 @@ error: could not compile `vertex_stage0` (lib test) due to 1 previous error
 
 ---
 
+
+## define-generics-and-whereclause-in-src-ast-generics-rs
+- Item: Define `Generics` and `WhereClause` in `src/ast/generics.rs`
+- Reason: blockers
+- Timestamp: 2026-04-27T04:30:59.9975978Z
+
+### Blocker: WherePred shape unspecified
+- severity: local
+- affects: where-clause parsing, generics parsing, future trait/impl items
+- question: Should `WherePred` be a struct `{ ty: Type, bounds: Vec<TraitBound> }`, an enum covering `Type: Bounds` / `'a: 'b` / `T = U`, or include a `span`/`id`?
+- default_assumption: Define `WherePred` as a single struct `{ ty: Type, bounds: Vec<TraitBound> }` with no id/span; later items can extend it (extra fields) or promote it to an enum once lifetime and equality predicates are needed. This is the smallest shape consistent with the spec's `predicates: Vec<WherePred>` bullet.
+- Resolution: 
+
+---
+
