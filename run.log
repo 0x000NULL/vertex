@@ -54,3 +54,9 @@
 ==> plan  implement-explain-e0xxx-subcommand
       plan: 60.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-explain-e0xxx-subcommand-plan-20260427T030206600.txt
 ==> exec  implement-explain-e0xxx-subcommand
+      exec: 162.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-explain-e0xxx-subcommand-execute-20260427T030448672.txt
+      notes: - Used `println!("{}", text)` (adds a trailing newline) rather than `print!`. The plan said "print to stdout" without specifying, and a trailing newline matches `rustc --explain` and is friendlier in shells. / - Factored the hit/miss branch into a tiny private `dispatch_explain` helper inside `lib.rs` to avoid duplicating the match across the `--explain` / `--explain=` code paths. The plan called this branch "small," and one helper kept that promise without adding any public surface.
+    [7/113] implement-explain-e0xxx-subcommand: plan $0.29 / execute $0.89 / verified / committed fb51246
+==> plan  define-tokenkind-enum-in-src-lexer-token-rs-keyword-variants
+      plan: 76.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-tokenkind-enum-in-src-lexer-token-rs-keyword-variants-plan-20260427T030605988.txt
+==> exec  define-tokenkind-enum-in-src-lexer-token-rs-keyword-variants

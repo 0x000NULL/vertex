@@ -117,7 +117,7 @@
 
 ## 3. Token enum
 
-- [ ] Define `TokenKind` enum in `src/lexer/token.rs` — keyword variants
+- [x] Define `TokenKind` enum in `src/lexer/token.rs` — keyword variants
   - [ ] 29 keyword variants: `Break, Const, Continue, Else, Enum, Extern, False, Fn, For, If, Impl, In, Let, Loop, Match, Mod, Mut, Not, Or, Pub, Return, SelfLower, SelfUpper, Struct, Trait, True, Type, Unsafe, Use, Where, While, And` (matches §2 of spec)
   - [ ] **Verify:** `cargo build`; `grep -q 'pub enum TokenKind' src/lexer/token.rs`
 
