@@ -104,3 +104,13 @@
 ==> exec  implement-float-literal-scanning
       exec: 78.04s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-float-literal-scanning-execute-20260427T032024933.txt
       notes: - The plan said the exponent's "require at least one ASCII digit" check should reject if absent. I implemented this with a `saw_exp_digit` flag rather than the plan's tentative `pos == exp_digit_start` (which would not reject `1.0e_` since `_` advances pos). The flag-based approach matches the spec exactly: at least one ASCII digit must appear in the exponent. / - The plan said "do not write the suffix into the parse buffer; ... Parse the scratch buffer with `f64::from_str`". I scan the suffix BEFORE parsing the buffer (since the buffer is already complete by then anyway, and `scan_float_suffix` only consumes bytes when a recognized suffix matches). This satisfies the constraint that the suffix is never written into the parse buffer.
+    [15/113] implement-float-literal-scanning: plan $0.30 / execute $0.57 / verified / committed 34a4bf4
+==> plan  implement-char-literal-scanning
+      plan: 60.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-char-literal-scanning-plan-20260427T032125673.txt
+==> exec  implement-char-literal-scanning
+      exec: 142.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-char-literal-scanning-execute-20260427T032347724.txt
+      notes: - For the `\xNN` upper-bound, I followed the plan's stated assumption and limited values to `0x00..=0x7F`, rejecting anything higher. / - For `\u{...}`, I rejected on >6 hex digits (counted while scanning) before reaching `}`, in addition to the `char::from_u32` validity check; this rejects `'\u{1234567}'` early without overflowing `u32`.
+    [16/113] implement-char-literal-scanning: plan $0.31 / execute $0.67 / verified / committed a24f2e2
+==> plan  implement-string-literal-scanning-regular
+      plan: 57.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-string-literal-scanning-regular-plan-20260427T032445895.txt
+==> exec  implement-string-literal-scanning-regular

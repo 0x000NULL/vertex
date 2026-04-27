@@ -167,7 +167,7 @@
   - [ ] Reject multi-codepoint content; reject unterminated
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::char_literal_escapes`
 
-- [ ] Implement string literal scanning (regular)
+- [x] Implement string literal scanning (regular)
   - [ ] Method `Scanner::scan_string`
   - [ ] Same escape set as chars; allow embedded newlines
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::string_literal_escapes`
