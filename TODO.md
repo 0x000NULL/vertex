@@ -89,7 +89,7 @@
   - [ ] Methods: `pub fn new(code, kind, span, msg)`, `pub fn with_suggestion(self, s) -> Self`, `pub fn with_note(self, n) -> Self`
   - [ ] **Verify:** `cargo test --lib error::tests::compile_error_builder_chains`
 
-- [ ] Implement `ErrorAccumulator` in `src/error.rs`
+- [x] Implement `ErrorAccumulator` in `src/error.rs`
   - [ ] Methods: `pub fn new()`, `pub fn push(&mut self, e: CompileError)`, `pub fn into_result<T>(self, ok: T) -> Result<T, Vec<CompileError>>`
   - [ ] Cap at 100 errors (silent drop after, but increment a counter)
   - [ ] Dedupe by `(code, span.file_id, span.start)`

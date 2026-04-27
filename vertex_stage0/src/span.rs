@@ -23,6 +23,10 @@ impl Span {
         self.end - self.start
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.end == self.start
+    }
+
     pub fn merge(&self, other: &Span) -> Span {
         Span {
             file_id: self.file_id,

@@ -88,3 +88,40 @@ Diff in \\?\C:\Users\Ethan\vertex\vertex_stage0\src\mir\mod.rs:1:
 
 ---
 
+
+## define-compileerror-struct-in-src-error-rs
+- Item: Define `CompileError` struct in `src/error.rs`
+- Reason: verify failed
+- Timestamp: 2026-04-27T02:56:32.2216795Z
+
+### Detail
+```
++ cargo test --lib -p vertex_stage0 error::tests::compile_error_builder_chains
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running unittests src\lib.rs (target\debug\deps\vertex_stage0-98f9861405ee0bf7.exe)
+
+running 1 test
+test error::tests::compile_error_builder_chains ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
++ cargo fmt --all -- --check
++ cargo clippy --all-targets -- -D warnings
+    Checking vertex_stage0 v0.1.0 (C:\Users\Ethan\vertex\vertex_stage0)
+error: struct `Span` has a public `len` method, but no `is_empty` method
+  --> vertex_stage0\src\span.rs:22:5
+   |
+22 |     pub fn len(&self) -> u32 {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#len_without_is_empty
+   = note: `-D clippy::len-without-is-empty` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::len_without_is_empty)]`
+
+error: could not compile `vertex_stage0` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `vertex_stage0` (lib test) due to 1 previous error
+```
+
+---
+

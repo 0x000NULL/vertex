@@ -1,4 +1,6 @@
-use crate::span::Span;
+use std::collections::HashSet;
+
+use crate::span::{FileId, Span};
 
 pub mod render;
 
@@ -16,7 +18,7 @@ pub struct Label {
     pub primary: bool,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ErrorCode(pub u32);
 
 impl ErrorCode {
@@ -123,5 +125,113 @@ impl CompileError {
     pub fn with_note(mut self, note: impl Into<String>) -> Self {
         self.notes.push(note.into());
         self
+    }
+}
+
+#[derive(Debug)]
+pub struct ErrorAccumulator {
+    errors: Vec<CompileError>,
+    seen: HashSet<(ErrorCode, FileId, u32)>,
+    dropped: u32,
+}
+
+impl ErrorAccumulator {
+    pub const MAX_ERRORS: usize = 100;
+
+    pub fn new() -> Self {
+        ErrorAccumulator {
+            errors: Vec::new(),
+            seen: HashSet::new(),
+            dropped: 0,
+        }
+    }
+
+    pub fn push(&mut self, e: CompileError) {
+        let key = (e.code, e.span.file_id, e.span.start);
+        if self.seen.contains(&key) {
+            return;
+        }
+        if self.errors.len() >= Self::MAX_ERRORS {
+            self.dropped += 1;
+            return;
+        }
+        self.seen.insert(key);
+        self.errors.push(e);
+    }
+
+    pub fn into_result<T>(self, ok: T) -> Result<T, Vec<CompileError>> {
+        if self.errors.is_empty() {
+            Ok(ok)
+        } else {
+            Err(self.errors)
+        }
+    }
+
+    pub fn dropped(&self) -> u32 {
+        self.dropped
+    }
+
+    pub fn len(&self) -> usize {
+        self.errors.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.errors.is_empty()
+    }
+}
+
+impl Default for ErrorAccumulator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::span::{FileId, Span};
+
+    fn make_err(code: ErrorCode, file_id: FileId, start: u32) -> CompileError {
+        CompileError::new(
+            code,
+            ErrorKind::Other,
+            Span::new(file_id, start, start),
+            "test",
+        )
+    }
+
+    #[test]
+    fn accumulator_caps_at_100() {
+        let file_id = FileId(0);
+        let mut acc = ErrorAccumulator::new();
+        for i in 0..150u32 {
+            acc.push(make_err(ErrorCode::E0001, file_id, i));
+        }
+        assert_eq!(acc.len(), 100);
+        assert_eq!(acc.dropped(), 50);
+
+        let result = acc.into_result(());
+        match result {
+            Err(v) => assert_eq!(v.len(), 100),
+            Ok(()) => panic!("expected Err"),
+        }
+    }
+
+    #[test]
+    fn accumulator_dedupes() {
+        let file_id = FileId(0);
+        let mut acc = ErrorAccumulator::new();
+
+        for _ in 0..5 {
+            acc.push(make_err(ErrorCode::E0001, file_id, 10));
+        }
+        acc.push(make_err(ErrorCode::E0002, file_id, 10));
+        acc.push(make_err(ErrorCode::E0001, file_id, 20));
+
+        let result = acc.into_result(());
+        match result {
+            Err(v) => assert_eq!(v.len(), 3),
+            Ok(()) => panic!("expected Err"),
+        }
     }
 }

@@ -20,3 +20,25 @@
 ==> exec  implement-span-struct-in-src-span-rs
       exec: 65.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-span-struct-in-src-span-rs-execute-20260427T025234224.txt
       notes: - For `len()`, the plan specified `u32` and `self.end - self.start`; used directly without overflow guards since the codebase invariant is `end >= start`. / - The `span_merge_takes_outer_bounds` test covers both overlapping and disjoint cases, asserts symmetry, and asserts `len() == end - start` on the result, per the plan.
+    [2/113] implement-span-struct-in-src-span-rs: plan $0.32 / execute $0.48 / verified / committed 91cfe6f
+==> plan  define-errorcode-and-errorkind-in-src-error-rs
+      plan: 70.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-errorcode-and-errorkind-in-src-error-rs-plan-20260427T025345427.txt
+==> exec  define-errorcode-and-errorkind-in-src-error-rs
+      exec: 51.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-errorcode-and-errorkind-in-src-error-rs-execute-20260427T025436478.txt
+      notes: - Followed rustc convention by placing `E0277` (trait bound) and `E0382` (moved value) numerically alongside related codes — `E0277` and `E0308` sit before the type band, and `E0382` sits before the borrow band. The plan called these out explicitly for `E0277`/`E0308`; I applied the same logic to `E0382` (which the plan listed under borrow check) since it's a real rustc code outside the 800–999 band. Constants are sorted by numeric value within the `impl` block for readability rather than grouped by category, since the doc comments label each. / - Did not add `Display`/`Debug` impls (per plan assumption — deferred to the `--explain` subcommand).
+    [3/113] define-errorcode-and-errorkind-in-src-error-rs: plan $0.42 / execute $0.40 / verified / committed 33a6226
+==> plan  define-compileerror-struct-in-src-error-rs
+      plan: 56.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-compileerror-struct-in-src-error-rs-plan-20260427T025533571.txt
+==> exec  define-compileerror-struct-in-src-error-rs
+      exec: 58.04s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-compileerror-struct-in-src-error-rs-execute-20260427T025631639.txt
+      notes: - Pre-existing clippy failure in `span.rs:22` (`len_without_is_empty`) is outside this plan's stated scope (the Steps only add a test in `error/mod.rs`). I did not modify `span.rs`, since fixing it would be unrelated scope creep on a different module. The new test itself is clippy-clean — only the pre-existing `Span::len` triggers the warning. / - The plan's Step 2 says "twice each" for both `with_suggestion` and `with_note`. I implemented exactly two calls of each on the chain. The first suggestion uses `replacement: None` (matching the example in the plan); the second uses `Some("x")` to confirm the field round-trips.
+    [4/113] define-compileerror-struct-in-src-error-rs: verify failed on 'cargo clippy --all-targets -- -D warnings'
+           = note: `-D clippy::len-without-is-empty` implied by `-D warnings`
+       = help: to override `-D warnings` add `#[allow(clippy::len_without_is_empty)]`
+    error: could not compile `vertex_stage0` (lib) due to 1 previous error
+    warning: build failed, waiting for other jobs to finish...
+    error: could not compile `vertex_stage0` (lib test) due to 1 previous error
+
+==> plan  implement-erroraccumulator-in-src-error-rs
+      plan: 69.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-erroraccumulator-in-src-error-rs-plan-20260427T025750657.txt
+==> exec  implement-erroraccumulator-in-src-error-rs
