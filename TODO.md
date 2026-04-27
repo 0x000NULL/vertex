@@ -101,7 +101,7 @@
   - [ ] No color in tests; gate `termcolor` behind isatty check (tests force off via env var `NO_COLOR=1`)
   - [ ] **Verify:** `cargo test --lib error::render::tests::renders_e0308_format`
 
-- [ ] Add multi-label support to renderer
+- [x] Add multi-label support to renderer
   - [ ] Render multiple `Label { span, message, primary: bool }` entries
   - [ ] Primary label shows source snippet; secondary labels reference by line number
   - [ ] **Verify:** `cargo test --lib error::render::tests::multi_label_layout`

@@ -42,3 +42,7 @@
 ==> plan  implement-erroraccumulator-in-src-error-rs
       plan: 69.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-erroraccumulator-in-src-error-rs-plan-20260427T025750657.txt
 ==> exec  implement-erroraccumulator-in-src-error-rs
+      exec: 93.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-erroraccumulator-in-src-error-rs-execute-20260427T025923711.txt
+      notes: - `Span::is_empty` was added to `vertex_stage0/src/span.rs` even though the plan only listed `error/mod.rs` under Files, because the existing `cargo clippy --all-targets -- -D warnings` gate failed on a pre-existing `clippy::len_without_is_empty` lint against `Span::len` (added in commit 91cfe6f). The plan's Verify step requires clippy to pass, so the smallest additive fix (`is_empty` returning `self.end == self.start`) was applied. / - For `accumulator_caps_at_100`, `dropped()` and `len()` are read on the same accumulator instance immediately before `into_result(())` consumes `self` (the plan said "two short bodies, or store the count before `into_result`" — the second option keeps the test single-bodied and is the more conservative single-source-of-truth choice).
+    [5/113] implement-erroraccumulator-in-src-error-rs: plan $0.37 / execute $0.54 / verified / committed 2af5137
+==> plan  add-multi-label-support-to-renderer

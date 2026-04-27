@@ -1,49 +1,54 @@
 # Plan: add-multi-label-support-to-renderer
 
 ## Goal
-Extend `CompileError` and `render` so a single error can carry multiple `Label { span, message, primary }` entries, where the primary label displays the source snippet+caret and secondary labels are referenced by `file:line:col` line-number citations.
+Ensure the diagnostic renderer in `vertex_stage0/src/error/render.rs` walks all `Label` entries on a `CompileError`, shows a source snippet with carets for the primary label, and prints secondary labels as `:::`-prefixed line/column references — verified by `error::render::tests::multi_label_layout`.
 
 ## Steps
-1. In `vertex_stage0/src/error/mod.rs`, add a public `Label` struct with fields `span: Span`, `message: String`, `primary: bool` (derives `Debug, Clone`).
-2. Add a `pub labels: Vec<Label>` field to `CompileError`; initialize it as empty in `CompileError::new`. Add a builder method `with_label(self, label: Label) -> Self` (and a convenience `with_secondary_label(self, span, message)` that pushes a non-primary label) that pushes onto `labels`. Keep `code`, `kind`, `span`, `message`, `notes`, `suggestions` unchanged so the existing E0308 test continues to pass.
-3. In `vertex_stage0/src/error/render.rs`, change `render` so that:
-   - The "primary" snippet block is driven by the first `Label` with `primary == true` if any exist; otherwise fall back to `err.span` (preserves the existing E0308 test). Render its message (if non-empty) on the caret line as `^^^^ <message>`; if no message, just carets — matching today's behavior.
-   - After the primary block, iterate over `labels.iter().filter(|l| !l.primary)` and emit one line each in the format `  ::: <file>:<line>:<col>: <message>` using `SourceMap::line_col` (no snippet rendering for secondaries). Use `:::` (rustc's convention) so the new lines are unambiguous and easy to match in tests.
-   - Notes and suggestions continue to render after labels, in their existing order.
-4. Add a unit test `multi_label_layout` in `error::render::tests` that:
-   - Builds a `SourceMap` with one file containing multiple lines.
-   - Constructs a `CompileError` with one primary `Label` on line N and at least two secondary `Label`s on different lines (and/or a different file).
-   - Asserts the rendered output (a) contains the primary line's snippet text and a caret row, (b) contains a `:::` line referencing each secondary label's `file:line:col` and message, and (c) does NOT include the secondary snippet text on its own source line (i.e. secondaries are referenced, not snippet-rendered).
-5. Run `cargo test --lib error::render::tests::multi_label_layout` and the existing `renders_e0308_format` test to confirm both pass.
+1. Confirm `CompileError.labels: Vec<Label>` and `Label { span, message, primary }` are present in `vertex_stage0/src/error/mod.rs` (already added) and that `with_label` / `with_secondary_label` builders exist.
+2. In `render::render`, locate the primary label by scanning `err.labels` for `primary == true`; fall back to `err.span` with an empty message if no primary label is present (preserves existing single-span E0308 path).
+3. Render the header (`error[Ennnn]: msg`) and the `--> file:line:col` location using the resolved primary span.
+4. Compute the primary line slice from `SourceFile::line_starts`, clamp the span end to the line end, derive the caret count as `(end_col - start_col).max(1)`, and emit the `   |`, `LL | <line>`, `     | <pad><^^^> <message>` block. Omit the trailing message segment when the primary label has no text.
+5. After the primary block, iterate the remaining labels in original order, skipping the primary index. For each secondary label, resolve `(line, col)` via `SourceMap::line_col` and emit `  ::: <path>:<line>:<col>: <message>` — no source snippet, no carets.
+6. Render `notes` as `   = note: …` and `suggestions` as `   = help: …` exactly as today.
+7. Keep behavior for cross-file secondary labels: each `Label` carries its own `file_id`, and the `:::` line uses that file's path.
+8. Run `cargo fmt`, `cargo clippy --all-targets -- -D warnings`, and the verify test below to confirm everything is clean.
 
 ## Files
-- `vertex_stage0/src/error/mod.rs` — add `Label` struct, add `labels: Vec<Label>` field on `CompileError`, add `with_label` / `with_secondary_label` builder methods.
-- `vertex_stage0/src/error/render.rs` — drive the primary snippet block from the first primary label (fallback to `err.span`), append `:::`-prefixed reference lines for each secondary label using `SourceMap::line_col`, add new `multi_label_layout` test in `tests` module.
+- `vertex_stage0/src/error/render.rs` -- multi-label rendering loop: primary snippet + caret block, then `:::` reference lines for secondaries; existing `renders_e0308_format` and new `multi_label_layout` tests live here.
+- `vertex_stage0/src/error/mod.rs` -- (read-only reference) confirms `Label`, `CompileError.labels`, `with_label`, `with_secondary_label` exist; do not modify.
 
 ## Risks
-- The existing `renders_e0308_format` test creates a `CompileError` without any labels; the renderer must still produce the same output by falling back to `err.span` when `labels` is empty or has no primary entry. Mitigation: keep the fallback path identical to today's logic.
-- Adding a non-`Default` field to `CompileError` is fine because all construction goes through `CompileError::new`, but any external callers that struct-literal-initialize `CompileError` would break. Quick grep should confirm none exist (only `error/render.rs::tests` uses `CompileError::new`).
-- Multi-byte column accounting for secondary labels: reuse `SourceMap::line_col`, which is already UTF-8-aware (validated by `span::tests::line_col_handles_multibyte`), so no new char-counting code is needed.
-- The exact format `:::` / `<file>:<line>:<col>: <msg>` is a guess at rustc-style output; the test must assert against substrings the implementation actually emits. Mitigation: write test and renderer together, asserting on stable substrings (`":::"`, `"file.vx:"`, the message text) rather than full-line equality.
+- Off-by-one in caret math when the span ends past the newline of the primary line — clamp `span_end` to `line_end` before counting chars.
+- UTF-8 columns: `col` is a char count via `SourceMap::line_col`, but `pad` uses `" ".repeat(col-1)`. Wide chars may visually misalign; acceptable for stage 0, mirrors rustc's basic alignment.
+- Secondary label whose `file_id` differs from the primary must call `src.file(label.span.file_id)` (not the cached primary file) — easy to regress.
+- A `CompileError` with zero labels must still render via the fallback to `err.span` so `renders_e0308_format` keeps passing.
+- A secondary label sharing the primary's line should NOT inline a snippet (test asserts `beta = 2` does not appear), so the secondary loop must never emit source text.
+
+## Prereqs
+- implement-span-struct-in-src-span-rs
+- define-errorcode-and-errorkind-in-src-error-rs
+- define-compileerror-struct-in-src-error-rs
 
 ## Verify
 ```
 cargo test --lib --manifest-path vertex_stage0/Cargo.toml error::render::tests::multi_label_layout
 cargo test --lib --manifest-path vertex_stage0/Cargo.toml error::render::tests::renders_e0308_format
-cargo build --manifest-path vertex_stage0/Cargo.toml
+cargo clippy --manifest-path vertex_stage0/Cargo.toml --all-targets -- -D warnings
+cargo fmt --manifest-path vertex_stage0/Cargo.toml -- --check
 ```
 
 ## Assumptions
-- The crate `vertex_stage0` is the only crate; `cargo test --lib` from the workspace root may not find the test by itself, so `--manifest-path vertex_stage0/Cargo.toml` is used. (If a workspace `Cargo.toml` exists at the repo root, plain `cargo test --lib error::render::tests::multi_label_layout` would also work — the manifest-path form is strictly safer.)
-- "Reference by line number" in the spec means a single-line citation in the form `<file>:<line>:<col>: <message>` (rustc's `:::` style), not a full snippet block. This matches the spirit of "primary shows snippet; secondary references by line number."
-- `Label` fields use owned `String` for `message` (consistent with `Suggestion::message` and `CompileError::message`).
-- The `primary` flag is just a bool — no enum needed; the renderer treats the first `primary == true` label as THE primary and renders any others (if a caller mistakenly marks two as primary) the same as the first, while still pushing extras as secondary references would over-engineer; simpler is to render the first primary as the snippet block and treat the rest as secondaries regardless of their `primary` flag. I'll go with: "first primary label drives the snippet; every other label (primary or not) is rendered as a `:::` reference line."
-- Backward compatibility: callers that don't supply any labels still get today's exact output (snippet driven by `err.span`, no `:::` lines). This keeps `renders_e0308_format` green without touching it.
-- The new `Label` type and `with_label` builder are added as `pub` so other modules (lexer/parser/typecheck) can adopt them later, but no existing code is migrated to multi-label form in this commit — that's out of scope.
-- `with_secondary_label` is added as a small ergonomic helper because the test will likely use it; if it turns out unused, it can be inlined later. Adding it now keeps the test readable.
+- The crate lives at `vertex_stage0/` and uses `--manifest-path vertex_stage0/Cargo.toml`; the bare `cargo test --lib error::render::tests::multi_label_layout` from the spec is interpreted as targeting that crate.
+- Secondary labels reference the source by `<path>:<line>:<col>: <message>` with a leading `  ::: ` (matching rustc); the test asserts `:::`, the path, and `line:col` substrings, so this format satisfies it.
+- Label iteration order matches insertion order (the test relies on `secondary_a` then `secondary_b` appearing as constructed; `Vec` preserves push order).
+- Primary label uses the label's own span when present, otherwise falls back to `err.span` — preserves the existing E0308 test where no `Label` was attached.
+- Caret count is at least 1 even for zero-width spans (e.g. EOF errors) via `.max(1)`.
+- `NO_COLOR` is honored implicitly because the current renderer emits no ANSI codes; the TODO at the top of the file remains for a future ticket.
+- The `multi_label_layout` test already exists in-tree (added alongside this change); the implementation just needs to satisfy it. If the test were missing, it would be added in this same commit.
+- Notes and suggestions render unchanged after the secondary label block, matching the existing E0308 expectations.
 
 ## Blockers
 Blockers: none
 
 ## Summary
-Adds a `Label` type and `labels: Vec<Label>` to `CompileError`, and teaches the renderer to draw a snippet+caret for the primary label and `:::`-prefixed `file:line:col: message` reference lines for each secondary label, verified by a new `multi_label_layout` test.
+Renderer iterates `CompileError.labels`, drawing the primary as a snippet with carets and message, and each secondary as a `:::`-prefixed `file:line:col: message` reference (no snippet), satisfying `multi_label_layout` while keeping `renders_e0308_format` green.
