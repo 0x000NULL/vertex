@@ -375,7 +375,7 @@
   - [ ] `loop { body }`, `while cond { body }`, `for pat in iter { body }`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::loop_while_for`
 
-- [ ] Parse match expressions
+- [x] Parse match expressions
   - [ ] `match scrut { pat if guard => expr, ... }`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::match_basic`
 

@@ -440,3 +440,9 @@
 ==> plan  parse-loop-while-for-expressions
       plan: 118.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-loop-while-for-expressions-plan-20260427T062228135.txt
 ==> exec  parse-loop-while-for-expressions
+      exec: 144.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-loop-while-for-expressions-execute-20260427T062452172.txt
+      notes: - The plan's negative case `for x 1i32 { 2i32 }` triggers the missing-`in` error path. With the stub-pattern code I wrote, after consuming the `Ident("x")` the parser calls `expect(&TokenKind::In)` which produces an `E0100`. Asserted directly on `e.code`. / - The plan's negative case `while true 1i32` exercises `parse_block`'s `expect(&TokenKind::LBrace)`, which yields `E0100`. Asserted directly on `e.code`.
+    [16/72] parse-loop-while-for-expressions: plan $0.89 / execute $1.05 / verified / committed 003790b
+==> plan  parse-match-expressions
+      plan: 114.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-match-expressions-plan-20260427T062647589.txt
+==> exec  parse-match-expressions

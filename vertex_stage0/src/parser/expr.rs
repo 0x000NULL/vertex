@@ -1,7 +1,7 @@
 use crate::ast::expr::{
     ArrayLit, ArrayRepeat, Binary, BinaryOp, Block, BoolLit, Call, Cast, CastTy, CharLit, Closure,
-    ClosureParam, Expr, FieldAccess, FloatLit, For, If, Index, IntLit, Loop, MethodCall, Pat, Range,
-    StrLit, Try, TupleFieldAccess, TupleLit, Unary, UnaryOp, While,
+    ClosureParam, Expr, FieldAccess, FloatLit, For, If, Index, IntLit, Loop, Match, MatchArm,
+    MethodCall, Pat, Range, StrLit, Try, TupleFieldAccess, TupleLit, Unary, UnaryOp, While,
 };
 use crate::ast::stmt::Stmt;
 use crate::error::{CompileError, ErrorCode, ErrorKind};
@@ -394,6 +394,80 @@ impl Parser {
         }))
     }
 
+    fn parse_match(&mut self) -> Result<Expr, CompileError> {
+        // TODO: once struct-literal heads land, the scrutinee will need a
+        // "no-struct-literal" expression context so `match s { ... }` does
+        // not consume the arm-list brace as a struct-literal body.
+        let match_tok = self.expect(&TokenKind::Match)?;
+        let start_span = match_tok.span;
+        let scrutinee = self.parse_expr()?;
+        self.expect(&TokenKind::LBrace)?;
+        let mut arms: Vec<MatchArm> = Vec::new();
+        while !matches!(self.peek(), TokenKind::RBrace | TokenKind::Eof) {
+            let arm = self.parse_match_arm()?;
+            arms.push(arm);
+            if matches!(self.peek(), TokenKind::Comma) {
+                self.bump();
+            } else if !matches!(self.peek(), TokenKind::RBrace) {
+                break;
+            }
+        }
+        let rbrace_tok = self.expect(&TokenKind::RBrace)?;
+        let span = start_span.merge(&rbrace_tok.span);
+        let id = self.new_node_id();
+        Ok(Expr::Match(Match {
+            id,
+            span,
+            scrutinee: Box::new(scrutinee),
+            arms,
+        }))
+    }
+
+    fn parse_match_arm(&mut self) -> Result<MatchArm, CompileError> {
+        let start_span = if self.pos < self.tokens.len() {
+            self.tokens[self.pos].span
+        } else if let Some(last) = self.tokens.last() {
+            last.span
+        } else {
+            crate::span::Span::new(crate::span::FileId(0), 0, 0)
+        };
+        // TODO: stub pattern slot — accepts a single literal/ident/`_` token.
+        // Replaced when the real pattern parser lands (see
+        // `parse-literal-patterns` / `parse-ident-patterns-mut-sub-binding` /
+        // `parse-or-patterns-and-wildcard`).
+        match self.peek() {
+            TokenKind::Ident(_)
+            | TokenKind::Underscore
+            | TokenKind::IntLiteral(_, _)
+            | TokenKind::FloatLiteral(_, _)
+            | TokenKind::CharLiteral(_)
+            | TokenKind::StringLiteral(_)
+            | TokenKind::RawStringLiteral(_)
+            | TokenKind::True
+            | TokenKind::False => {
+                self.bump();
+            }
+            _ => return Err(self.unexpected_token_error("pattern")),
+        }
+        let guard = if matches!(self.peek(), TokenKind::If) {
+            self.bump();
+            Some(Box::new(self.parse_expr()?))
+        } else {
+            None
+        };
+        self.expect(&TokenKind::FatArrow)?;
+        let body = self.parse_expr()?;
+        let span = start_span.merge(&body.span());
+        let id = self.new_node_id();
+        Ok(MatchArm {
+            id,
+            span,
+            pattern: Pat::Placeholder,
+            guard,
+            body: Box::new(body),
+        })
+    }
+
     pub fn parse_block(&mut self) -> Result<Expr, CompileError> {
         let lbrace_tok = self.expect(&TokenKind::LBrace)?;
         let lbrace_span = lbrace_tok.span;
@@ -753,6 +827,7 @@ impl Parser {
             TokenKind::Loop => self.parse_loop(),
             TokenKind::While => self.parse_while(),
             TokenKind::For => self.parse_for(),
+            TokenKind::Match => self.parse_match(),
             _ => Err(self.unexpected_token_error("expression")),
         }
     }
@@ -774,7 +849,7 @@ impl Parser {
     }
 }
 
-// TODO: extend this set when `Ident`/`Match`/`Loop`/`Block`/`[`/path heads
+// TODO: extend this set when `Ident`/`Loop`/`Block`/`[`/path heads
 // become valid expression starters; otherwise `a.. <new-form>` will be misparsed
 // as `a..` followed by stray tokens.
 fn range_rhs_starts_here(kind: &TokenKind) -> bool {
@@ -793,6 +868,7 @@ fn range_rhs_starts_here(kind: &TokenKind) -> bool {
             | TokenKind::Star
             | TokenKind::Amp
             | TokenKind::If
+            | TokenKind::Match
     )
 }
 
@@ -2461,6 +2537,127 @@ mod tests {
                 other
             ),
         }
+    }
+
+    #[test]
+    fn match_basic() {
+        use crate::ast::expr::Pat;
+
+        // match 1i32 { 1i32 => 2i32, _ => 3i32 }
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Match),
+            int_tok(1),
+            tok(TokenKind::LBrace),
+            int_tok(1),
+            tok(TokenKind::FatArrow),
+            int_tok(2),
+            tok(TokenKind::Comma),
+            tok(TokenKind::Underscore),
+            tok(TokenKind::FatArrow),
+            int_tok(3),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Match(m)) => {
+                assert_eq!(int_value(&m.scrutinee), 1);
+                assert_eq!(m.arms.len(), 2);
+                assert!(matches!(m.arms[0].pattern, Pat::Placeholder));
+                assert!(m.arms[0].guard.is_none());
+                assert_eq!(int_value(&m.arms[0].body), 2);
+                assert!(matches!(m.arms[1].pattern, Pat::Placeholder));
+                assert!(m.arms[1].guard.is_none());
+                assert_eq!(int_value(&m.arms[1].body), 3);
+            }
+            other => panic!("expected Match for `match 1 {{ 1 => 2, _ => 3 }}`, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+
+        // match 1i32 { x if true => 2i32 }
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Match),
+            int_tok(1),
+            tok(TokenKind::LBrace),
+            tok(TokenKind::Ident("x".to_string())),
+            tok(TokenKind::If),
+            tok(TokenKind::True),
+            tok(TokenKind::FatArrow),
+            int_tok(2),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Match(m)) => {
+                assert_eq!(m.arms.len(), 1);
+                let g = m.arms[0].guard.as_ref().expect("guard");
+                match &**g {
+                    Expr::BoolLit(b) => assert!(b.value),
+                    other => panic!("expected BoolLit guard, got {:?}", other),
+                }
+                assert_eq!(int_value(&m.arms[0].body), 2);
+            }
+            other => panic!(
+                "expected Match for `match 1 {{ x if true => 2 }}`, got {:?}",
+                other
+            ),
+        }
+        assert!(p.errors.is_empty());
+
+        // match 1i32 { 1i32 => 2i32, _ => 3i32, } (trailing comma)
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Match),
+            int_tok(1),
+            tok(TokenKind::LBrace),
+            int_tok(1),
+            tok(TokenKind::FatArrow),
+            int_tok(2),
+            tok(TokenKind::Comma),
+            tok(TokenKind::Underscore),
+            tok(TokenKind::FatArrow),
+            int_tok(3),
+            tok(TokenKind::Comma),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Ok(Expr::Match(m)) => {
+                assert_eq!(m.arms.len(), 2);
+                assert_eq!(int_value(&m.arms[0].body), 2);
+                assert_eq!(int_value(&m.arms[1].body), 3);
+            }
+            other => panic!("expected Match with trailing comma, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+
+        // Error: missing `=>` (e.g. `match 1i32 { _ 2i32 }`) → E0100
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Match),
+            int_tok(1),
+            tok(TokenKind::LBrace),
+            tok(TokenKind::Underscore),
+            int_tok(2),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Err(e) => assert_eq!(e.code, ErrorCode::E0100),
+            Ok(other) => panic!(
+                "expected Err with E0100 for `match 1 {{ _ 2 }}`, got Ok({:?})",
+                other
+            ),
+        }
+
+        // Error: unexpected `}` mid-arm (e.g. `match 1i32 { _ => }`) → Err
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Match),
+            int_tok(1),
+            tok(TokenKind::LBrace),
+            tok(TokenKind::Underscore),
+            tok(TokenKind::FatArrow),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        assert!(p.parse_expr().is_err());
     }
 
     #[test]
