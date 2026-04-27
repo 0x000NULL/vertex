@@ -80,3 +80,9 @@
 ==> exec  define-token-struct
       exec: 46.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\define-token-struct-execute-20260427T031057854.txt
       notes: - Followed the plan exactly: added `use crate::span::Span;` at the top of `token.rs`, appended `Token` struct with `#[derive(Debug, Clone)]`, and added a `new(kind, span)` constructor. / - Did not derive `PartialEq` on `Token` (consistent with the plan's rationale — `TokenKind::FloatLiteral` carries `f64` which is not `Eq`, and skipping it keeps the surface minimal).
+    [11/113] define-token-struct: plan $0.29 / execute $0.31 / verified / committed ea33099
+==> plan  implement-scanner-struct-in-src-lexer-scan-rs
+      plan: 43.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-scanner-struct-in-src-lexer-scan-rs-plan-20260427T031141667.txt
+==> exec  implement-scanner-struct-in-src-lexer-scan-rs
+      exec: 55.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\implement-scanner-struct-in-src-lexer-scan-rs-execute-20260427T031236719.txt
+      notes: - Module declaration ordering: placed `pub mod scan;` above `pub mod token;` (alphabetical) rather than below; the plan said "next to" without specifying order. / - `Scanner` was not given a `#[derive(...)]` because the plan's struct signature did not request one and downstream usage hasn't been specified yet. Conservative choice: omit derives until needed.

@@ -146,7 +146,7 @@
   - [ ] Methods: `pub fn new(src, file_id)`, helpers `peek`, `peek_at`, `bump`, `eat_while`
   - [ ] **Verify:** `cargo build`; `grep -q 'pub struct Scanner' src/lexer/scan.rs`
 
-- [ ] Implement decimal int literal scanning
+- [x] Implement decimal int literal scanning
   - [ ] Method `Scanner::scan_int_decimal` returning `(u64, IntSuffix, Span)`
   - [ ] Handle `_` separators; reject leading `_`
   - [ ] Handle suffix parse (i8/i16/i32/i64/isize/u8/.../usize)
