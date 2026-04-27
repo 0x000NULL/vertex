@@ -229,3 +229,16 @@ plan=1.2540015 exec=1.892615 total=3.1466165
 
 ---
 
+
+## parse-item-statements-nested-fn-struct-inside-a-block
+- Item: Parse item statements (nested fn / struct inside a block)
+- Reason: cost ceiling
+- Timestamp: 2026-04-27T06:54:58.1763128Z
+
+### Detail
+```
+plan=1.225086 exec=2.277349 total=3.502435
+```
+
+---
+

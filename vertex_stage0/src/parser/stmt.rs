@@ -19,6 +19,7 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::expr::{Block, Expr};
     use crate::lexer::token::{IntSuffix, Token};
     use crate::span::{FileId, Span};
 
@@ -34,6 +35,13 @@ mod tests {
         match e {
             Expr::IntLit(lit) => lit.value,
             other => panic!("expected IntLit, got {:?}", other),
+        }
+    }
+
+    fn as_block(e: Expr) -> Block {
+        match e {
+            Expr::Block(b) => b,
+            other => panic!("expected Block, got {:?}", other),
         }
     }
 
@@ -66,5 +74,103 @@ mod tests {
         }
         assert_eq!(p.pos, 1);
         assert!(p.errors.is_empty());
+    }
+
+    #[test]
+    fn block_value_semantics() {
+        // `{ 1i32 }` → tail-only, block-typed
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBrace),
+            int_tok(1),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let b = as_block(p.parse_block().expect("parse_block"));
+        assert!(b.stmts.is_empty());
+        let tail = b.tail.expect("tail");
+        assert_eq!(int_value(&tail), 1);
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // `{ 1i32 ; }` → trailing semi, unit-typed
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBrace),
+            int_tok(1),
+            tok(TokenKind::Semi),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let b = as_block(p.parse_block().expect("parse_block"));
+        assert_eq!(b.stmts.len(), 1);
+        match &b.stmts[0] {
+            Stmt::Expr { expr, has_semi } => {
+                assert!(*has_semi);
+                assert_eq!(int_value(expr), 1);
+            }
+            other => panic!("expected Stmt::Expr, got {:?}", other),
+        }
+        assert!(b.tail.is_none());
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // `{ }` → empty, unit-typed
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBrace),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let b = as_block(p.parse_block().expect("parse_block"));
+        assert!(b.stmts.is_empty());
+        assert!(b.tail.is_none());
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // `{ 1i32 ; 2i32 }` → stmt then tail
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBrace),
+            int_tok(1),
+            tok(TokenKind::Semi),
+            int_tok(2),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let b = as_block(p.parse_block().expect("parse_block"));
+        assert_eq!(b.stmts.len(), 1);
+        match &b.stmts[0] {
+            Stmt::Expr { expr, has_semi } => {
+                assert!(*has_semi);
+                assert_eq!(int_value(expr), 1);
+            }
+            other => panic!("expected Stmt::Expr, got {:?}", other),
+        }
+        let tail = b.tail.expect("tail");
+        assert_eq!(int_value(&tail), 2);
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // `{ 1i32 ; 2i32 ; }` → all semi'd, unit-typed
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBrace),
+            int_tok(1),
+            tok(TokenKind::Semi),
+            int_tok(2),
+            tok(TokenKind::Semi),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let b = as_block(p.parse_block().expect("parse_block"));
+        assert_eq!(b.stmts.len(), 2);
+        for (i, expected) in [(0u64, 1u64), (1u64, 2u64)] {
+            match &b.stmts[i as usize] {
+                Stmt::Expr { expr, has_semi } => {
+                    assert!(*has_semi);
+                    assert_eq!(int_value(expr), expected);
+                }
+                other => panic!("expected Stmt::Expr, got {:?}", other),
+            }
+        }
+        assert!(b.tail.is_none());
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
     }
 }

@@ -398,7 +398,7 @@
 - [ ] Parse item statements (nested fn / struct inside a block)
   - [ ] **Verify:** `cargo test --lib parser::stmt::tests::nested_item_in_block`
 
-- [ ] Block trailing-expression-as-value semantics
+- [x] Block trailing-expression-as-value semantics
   - [ ] Last statement without `;` is the block's value; otherwise unit
   - [ ] **Verify:** `cargo test --lib parser::stmt::tests::block_value_semantics`
 

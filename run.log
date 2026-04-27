@@ -464,3 +464,13 @@
 ==> plan  parse-expression-statements-with-semicolon-significance
       plan: 91.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-expression-statements-with-semicolon-significance-plan-20260427T064509511.txt
 ==> exec  parse-expression-statements-with-semicolon-significance
+      exec: 105.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-expression-statements-with-semicolon-significance-execute-20260427T064654542.txt
+      notes: - The plan offered two phrasings for delegation in `parse_block`. I chose the conservative "small `expr_stmt_from(expr, has_semi) -> Stmt` helper" approach explicitly preferred by the plan, leaving the `RBrace` lookahead and the `parse_expr` call in `parse_block` untouched — only the `Stmt::Expr { ... }` constructions are now delegated to `crate::parser::stmt::expr_stmt_from`. `parse_expr_stmt` is the standalone routine whose behavior the new test pins; it is not yet a caller of `parse_block` because doing so would change tail-vs-stmt classification. / - The new `parse_expr_stmt` does not consume any terminator beyond `;` (no `RBrace`/`Eof` handling inside it), matching the plan's "does not consume a trailing terminator beyond `;`" assumption.
+    [20/72] parse-expression-statements-with-semicolon-significance: plan $0.58 / execute $0.77 / verified / committed 3babfee
+==> plan  parse-item-statements-nested-fn-struct-inside-a-block
+      plan: 217.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-item-statements-nested-fn-struct-inside-a-block-plan-20260427T065033109.txt
+==> exec  parse-item-statements-nested-fn-struct-inside-a-block
+      exec: 265.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-item-statements-nested-fn-struct-inside-a-block-execute-20260427T065458173.txt
+      notes: - The plan calls `self.unexpected_token_error(...)` from `parser::stmt`, but the existing definition in `parser/expr.rs` was module-private (`fn`). I bumped its visibility to `pub(super)` so the sibling `parser::stmt` module can call it. This is the smallest accessibility change that lets the plan compile as written; no logic change. / - I added `use std::mem;` and `use crate::span::Span;` to `parser/stmt.rs` for the new helper, and `use crate::ast::item::{FnDef, Item, StructDef};` per the plan. `FileId` was unneeded outside the existing `mod tests`.
+    [21/72] parse-item-statements-nested-fn-struct-inside-a-block: cost ceiling hit (total=3.502435)
+==> plan  block-trailing-expression-as-value-semantics
