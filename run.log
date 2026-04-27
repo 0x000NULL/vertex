@@ -474,3 +474,9 @@
       notes: - The plan calls `self.unexpected_token_error(...)` from `parser::stmt`, but the existing definition in `parser/expr.rs` was module-private (`fn`). I bumped its visibility to `pub(super)` so the sibling `parser::stmt` module can call it. This is the smallest accessibility change that lets the plan compile as written; no logic change. / - I added `use std::mem;` and `use crate::span::Span;` to `parser/stmt.rs` for the new helper, and `use crate::ast::item::{FnDef, Item, StructDef};` per the plan. `FileId` was unneeded outside the existing `mod tests`.
     [21/72] parse-item-statements-nested-fn-struct-inside-a-block: cost ceiling hit (total=3.502435)
 ==> plan  block-trailing-expression-as-value-semantics
+      plan: 111.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\block-trailing-expression-as-value-semantics-plan-20260427T065730934.txt
+==> exec  block-trailing-expression-as-value-semantics
+      exec: 91.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\block-trailing-expression-as-value-semantics-execute-20260427T065901970.txt
+      notes: - The plan said to add `use crate::ast::expr::{Block, Expr};` even though `Expr` is already in scope via `use super::*;` (the production module imports `Expr` at line 1). I followed the plan literally; rustc accepts the redundant import without warnings. / - For the "all semi'd" case I used a small `for (i, expected) in [(0,1),(1,2)]` loop to assert both stmts symmetrically rather than two copy-pasted `match` arms. Same assertions, same coverage; chose this as the more concise interpretation of "two `Stmt::Expr { has_semi: true }`".
+    [22/72] block-trailing-expression-as-value-semantics: plan $0.75 / execute $0.66 / verified / committed 2a37911
+==> plan  insert-placeholder-expr-error-nodeid-span-and-continue

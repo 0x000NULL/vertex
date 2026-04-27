@@ -406,7 +406,7 @@
 
 ## 11. Parser error recovery
 
-- [ ] Insert placeholder `Expr::Error(NodeId, Span)` and continue
+- [x] Insert placeholder `Expr::Error(NodeId, Span)` and continue
   - [ ] Add `Error` variant to `Expr` enum with `id, span`
   - [ ] On parse failure, push `CompileError`, return placeholder, sync to next stmt boundary
   - [ ] **Verify:** `cargo test --lib parser::tests::error_node_recovery`

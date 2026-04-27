@@ -396,6 +396,7 @@ pub enum Expr {
     Return(Return),
     Break(Break),
     Continue(Continue),
+    Error(NodeId, Span),
 }
 
 impl Expr {
@@ -431,6 +432,7 @@ impl Expr {
             Expr::Return(e) => e.id,
             Expr::Break(e) => e.id,
             Expr::Continue(e) => e.id,
+            Expr::Error(id, _) => *id,
         }
     }
 
@@ -466,6 +468,7 @@ impl Expr {
             Expr::Return(e) => e.span,
             Expr::Break(e) => e.span,
             Expr::Continue(e) => e.span,
+            Expr::Error(_, span) => *span,
         }
     }
 }

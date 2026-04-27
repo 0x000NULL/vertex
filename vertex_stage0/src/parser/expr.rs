@@ -525,6 +525,19 @@ impl Parser {
         }))
     }
 
+    pub(crate) fn parse_expr_or_recover(&mut self) -> Expr {
+        match self.parse_expr() {
+            Ok(expr) => expr,
+            Err(e) => {
+                let span = e.span;
+                self.errors.push(e);
+                self.recover_to_sync();
+                let id = self.new_node_id();
+                Expr::Error(id, span)
+            }
+        }
+    }
+
     pub fn parse_block(&mut self) -> Result<Expr, CompileError> {
         let lbrace_tok = self.expect(&TokenKind::LBrace)?;
         let lbrace_span = lbrace_tok.span;
@@ -532,7 +545,7 @@ impl Parser {
         let mut stmts: Vec<Stmt> = Vec::new();
         let mut tail: Option<Box<Expr>> = None;
         while !matches!(self.peek(), TokenKind::RBrace | TokenKind::Eof) {
-            let expr = self.parse_expr()?;
+            let expr = self.parse_expr_or_recover();
             match self.peek() {
                 TokenKind::Semi => {
                     self.bump();

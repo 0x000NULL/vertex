@@ -222,6 +222,8 @@ fn describe(kind: &TokenKind) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::expr::Expr;
+    use crate::lexer::token::IntSuffix;
     use crate::span::{FileId, Span};
 
     fn tok(kind: TokenKind) -> Token {
@@ -279,5 +281,40 @@ mod tests {
         ]);
         p.recover_to_sync();
         assert_eq!(p.peek(), &TokenKind::Fn);
+    }
+
+    #[test]
+    fn error_node_recovery() {
+        let mut p = Parser::new(vec![
+            tok(TokenKind::LBrace),
+            tok(TokenKind::Comma),
+            tok(TokenKind::Semi),
+            tok(TokenKind::IntLiteral(1, IntSuffix::I32)),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let block = match p.parse_block().expect("parse_block") {
+            Expr::Block(b) => b,
+            other => panic!("expected Block, got {:?}", other),
+        };
+        assert_eq!(block.stmts.len(), 1);
+        match &block.stmts[0] {
+            crate::ast::stmt::Stmt::Expr { expr, .. } => {
+                assert!(matches!(expr, Expr::Error(_, _)));
+            }
+            other => panic!("expected Stmt::Expr, got {:?}", other),
+        }
+        let tail = block.tail.expect("tail");
+        match &*tail {
+            Expr::IntLit(lit) => assert_eq!(lit.value, 1),
+            other => panic!("expected IntLit tail, got {:?}", other),
+        }
+        assert_eq!(p.errors.len(), 1);
+        assert_eq!(p.peek(), &TokenKind::Eof);
+        let errs = std::mem::take(&mut p.errors)
+            .into_result(())
+            .expect_err("expected accumulated error");
+        assert_eq!(errs[0].code, ErrorCode::E0100);
+        assert_eq!(errs[0].kind, ErrorKind::Syntax);
     }
 }
