@@ -2,7 +2,7 @@ use crate::ast::expr::{Expr, GenericArg, IntLit, Path, PathSegment};
 use crate::ast::generics::{Generics, TraitBound, TypeParam, WhereClause, WherePred};
 use crate::ast::item::{
     EnumDef, EnumVariant, Field, FnDef, Item, ModDef, ModKind, Param, StructDef, StructKind,
-    TraitDef, TraitItem, TraitItemConst, TraitItemFn, TraitItemType, VariantKind,
+    TraitDef, TraitItem, TraitItemConst, TraitItemFn, TraitItemType, UseDef, VariantKind,
 };
 use crate::ast::ty::Type;
 use crate::error::{CompileError, ErrorCode, ErrorKind};
@@ -943,6 +943,49 @@ impl Parser {
             span,
             name,
             kind,
+        }))
+    }
+
+    pub fn parse_use(&mut self) -> Result<Item, CompileError> {
+        let use_kw = self.expect(&TokenKind::Use)?;
+        let start_span = use_kw.span;
+
+        let mut segments: Vec<String> = Vec::new();
+        let head_tok = self.expect(&TokenKind::Ident(String::new()))?;
+        match head_tok.kind {
+            TokenKind::Ident(s) => segments.push(s),
+            _ => unreachable!(),
+        }
+        while self.eat(&TokenKind::ColonColon) {
+            let seg_tok = self.expect(&TokenKind::Ident(String::new()))?;
+            match seg_tok.kind {
+                TokenKind::Ident(s) => segments.push(s),
+                _ => unreachable!(),
+            }
+        }
+
+        let mut alias: Option<String> = None;
+        if let TokenKind::Ident(s) = self.peek().clone() {
+            if s == "as" {
+                self.bump();
+                let alias_tok = self.expect(&TokenKind::Ident(String::new()))?;
+                match alias_tok.kind {
+                    TokenKind::Ident(name) => alias = Some(name),
+                    _ => unreachable!(),
+                }
+            }
+        }
+
+        let semi_tok = self.expect(&TokenKind::Semi)?;
+        let end_span = semi_tok.span;
+
+        let span = start_span.merge(&end_span);
+        let id = self.new_node_id();
+        Ok(Item::Use(UseDef {
+            id,
+            span,
+            segments,
+            alias,
         }))
     }
 
@@ -1907,6 +1950,48 @@ mod tests {
             }
             other => panic!("expected ModKind::Inline, got {:?}", other),
         }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+    }
+
+    fn as_use(item: Item) -> UseDef {
+        match item {
+            Item::Use(u) => u,
+            other => panic!("expected Item::Use, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn use_simple_and_alias() {
+        // use foo::bar;
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Use),
+            ident_tok("foo"),
+            tok(TokenKind::ColonColon),
+            ident_tok("bar"),
+            tok(TokenKind::Semi),
+            tok(TokenKind::Eof),
+        ]);
+        let u = as_use(p.parse_use().expect("parse_use"));
+        assert_eq!(u.segments, vec!["foo".to_string(), "bar".to_string()]);
+        assert!(u.alias.is_none());
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+
+        // use foo::bar as baz;
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Use),
+            ident_tok("foo"),
+            tok(TokenKind::ColonColon),
+            ident_tok("bar"),
+            ident_tok("as"),
+            ident_tok("baz"),
+            tok(TokenKind::Semi),
+            tok(TokenKind::Eof),
+        ]);
+        let u = as_use(p.parse_use().expect("parse_use"));
+        assert_eq!(u.segments, vec!["foo".to_string(), "bar".to_string()]);
+        assert_eq!(u.alias, Some("baz".to_string()));
         assert!(p.errors.is_empty());
         assert!(matches!(p.peek(), TokenKind::Eof));
     }

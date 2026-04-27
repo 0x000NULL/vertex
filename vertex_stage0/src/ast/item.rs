@@ -164,6 +164,8 @@ pub struct ModDef {
 pub struct UseDef {
     pub id: NodeId,
     pub span: Span,
+    pub segments: Vec<String>,
+    pub alias: Option<String>,
 }
 
 #[allow(dead_code)]

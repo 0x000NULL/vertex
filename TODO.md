@@ -490,7 +490,7 @@
   - [ ] Both forms produce `ModDef` with `kind: ModKind::External | ModKind::Inline(items)`
   - [ ] **Verify:** `cargo test --lib parser::item::tests::mod_external_vs_inline`
 
-- [ ] Parse `use` items — simple paths
+- [x] Parse `use` items — simple paths
   - [ ] `use foo::bar;`, `use foo::bar as baz;`
   - [ ] **Verify:** `cargo test --lib parser::item::tests::use_simple_and_alias`
 

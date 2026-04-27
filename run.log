@@ -571,3 +571,11 @@
 ==> exec  parse-inherent-and-trait-impls
       exec: 218.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-inherent-and-trait-impls-execute-20260427T080710215.txt
       notes: - The plan's example token stream `fn clone(&self) -> Self {}` cannot round-trip through the current stopgap `parse_type`, which only accepts `Ident(_)` (not `SelfUpper`). I dropped the `-> Self` return type from the `clone` method in the test (so it parses as `fn clone(&self) {}`). The plan's assertions did not require checking `ret_ty`, so this is invisible to the four-item assertions. / - The plan says "four items" in the trait-impl body but only enumerates three (`Fn(clone)`, `Type{Item,...}`, `Const{MAX,...}`). I treated this as a typo and asserted `i.items.len() == 3`.
+    [37/72] parse-inherent-and-trait-impls: cost ceiling hit (total=3.04910075)
+==> plan  parse-mod-foo-file-loaded-vs-mod-foo-inline
+      plan: 80.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-mod-foo-file-loaded-vs-mod-foo-inline-plan-20260427T080922684.txt
+==> exec  parse-mod-foo-file-loaded-vs-mod-foo-inline
+      exec: 97.01s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-mod-foo-file-loaded-vs-mod-foo-inline-execute-20260427T081059718.txt
+      notes: - Placed `parse_mod` and `parse_mod_inline_item` immediately after `parse_trait_method` inside the existing `impl Parser` block — most-conservative placement to avoid restructuring. / - For the inline-mod body, I followed the plan literally: when an unsupported leading token appears, propagate the `expect_one_of` error (no `recover_to_sync` call), keeping the current `parse_mod` call's error path clean.
+    [38/72] parse-mod-foo-file-loaded-vs-mod-foo-inline: plan $0.65 / execute $0.88 / verified / committed fe395fc
+==> plan  parse-use-items-simple-paths
