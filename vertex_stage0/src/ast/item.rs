@@ -189,6 +189,9 @@ pub struct UseDef {
 pub struct ConstDef {
     pub id: NodeId,
     pub span: Span,
+    pub name: String,
+    pub ty: Type,
+    pub value: Expr,
 }
 
 #[allow(dead_code)]

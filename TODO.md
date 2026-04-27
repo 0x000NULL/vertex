@@ -502,7 +502,7 @@
 
 ## 15. Item parsers — const/static/type-alias
 
-- [ ] Parse `const` items
+- [x] Parse `const` items
   - [ ] `const NAME: T = expr;`
   - [ ] **Verify:** `cargo test --lib parser::item::tests::const_item`
 

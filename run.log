@@ -587,3 +587,7 @@
 ==> plan  parse-use-items-nested-glob
       plan: 132.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-use-items-nested-glob-plan-20260427T081637387.txt
 ==> exec  parse-use-items-nested-glob
+      exec: 183.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-use-items-nested-glob-execute-20260427T081940431.txt
+      notes: - `parse_use_tree_group` is factored out as a private helper rather than inlined inside `parse_use_tree`. The plan describes a "Nested-group helper" so I gave it a name; both call sites (top-level `{...}` and `prefix::{...}`) reuse it. / - For trailing-comma handling I check `RBrace` after each `Comma`, so `{ a, b, }` is accepted but `{ , }` would still try to parse a tree (the spec only requires trailing comma support, which works).
+    [40/72] parse-use-items-nested-glob: plan $0.69 / execute $1.31 / verified / committed 5751d03
+==> plan  parse-const-items

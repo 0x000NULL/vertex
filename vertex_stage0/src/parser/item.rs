@@ -1,8 +1,9 @@
 use crate::ast::expr::{Expr, GenericArg, IntLit, Path, PathSegment};
 use crate::ast::generics::{Generics, TraitBound, TypeParam, WhereClause, WherePred};
 use crate::ast::item::{
-    EnumDef, EnumVariant, Field, FnDef, Item, ModDef, ModKind, Param, StructDef, StructKind,
-    TraitDef, TraitItem, TraitItemConst, TraitItemFn, TraitItemType, UseDef, UseTree, VariantKind,
+    ConstDef, EnumDef, EnumVariant, Field, FnDef, Item, ModDef, ModKind, Param, StructDef,
+    StructKind, TraitDef, TraitItem, TraitItemConst, TraitItemFn, TraitItemType, UseDef, UseTree,
+    VariantKind,
 };
 use crate::ast::ty::Type;
 use crate::error::{CompileError, ErrorCode, ErrorKind};
@@ -1061,6 +1062,34 @@ impl Parser {
                 unreachable!();
             }
         }
+    }
+
+    pub fn parse_const(&mut self) -> Result<Item, CompileError> {
+        let const_kw = self.expect(&TokenKind::Const)?;
+        let start_span = const_kw.span;
+
+        let name_tok = self.expect(&TokenKind::Ident(String::new()))?;
+        let name = match name_tok.kind {
+            TokenKind::Ident(s) => s,
+            _ => unreachable!(),
+        };
+
+        self.expect(&TokenKind::Colon)?;
+        let ty = self.parse_type()?;
+        self.expect(&TokenKind::Eq)?;
+        let value = self.parse_expr()?;
+        let semi_tok = self.expect(&TokenKind::Semi)?;
+        let end_span = semi_tok.span;
+
+        let span = start_span.merge(&end_span);
+        let id = self.new_node_id();
+        Ok(Item::Const(ConstDef {
+            id,
+            span,
+            name,
+            ty,
+            value,
+        }))
     }
 }
 
@@ -2171,6 +2200,37 @@ mod tests {
                 assert!(alias.is_none());
             }
             other => panic!("expected UseTree::Simple, got {:?}", other),
+        }
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+    }
+
+    fn as_const(item: Item) -> ConstDef {
+        match item {
+            Item::Const(c) => c,
+            other => panic!("expected Item::Const, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn const_item() {
+        // const N: i32 = 1i32;
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Const),
+            ident_tok("N"),
+            tok(TokenKind::Colon),
+            ident_tok("i32"),
+            tok(TokenKind::Eq),
+            int_tok(1),
+            tok(TokenKind::Semi),
+            tok(TokenKind::Eof),
+        ]);
+        let c = as_const(p.parse_const().expect("parse_const"));
+        assert_eq!(c.name, "N");
+        assert_eq!(type_ident(&c.ty), "i32");
+        match &c.value {
+            Expr::IntLit(lit) => assert_eq!(lit.value, 1),
+            other => panic!("expected Expr::IntLit, got {:?}", other),
         }
         assert!(p.errors.is_empty());
         assert!(matches!(p.peek(), TokenKind::Eof));
