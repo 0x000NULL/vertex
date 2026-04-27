@@ -268,3 +268,11 @@
       notes: - Made the `tokens`, `pos`, and `errors` fields `pub` so future parser items in the same crate can access state without ceremony. The plan didn't specify visibility; `pub` is the most permissive but lowest-friction conservative choice (this is a library crate and these are obvious internals; trivial to tighten to `pub(crate)` later if a CLAUDE.md convention says otherwise). / - Implemented the static EOF fallback as `static EOF_KIND: TokenKind = TokenKind::Eof;` (the unit variant is `'static`-constructible) and return `&EOF_KIND`.
     [42/113] implement-parser-struct-in-src-parser-mod-rs: plan $0.49 / execute $0.73 / verified / committed 2108f05
 ==> plan  add-error-recovery-sync-points
+      plan: 83.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-error-recovery-sync-points-plan-20260427T043542812.txt
+==> exec  add-error-recovery-sync-points
+      exec: 81.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-error-recovery-sync-points-execute-20260427T043703853.txt
+      notes: - Omitted `TokenKind::Static` from the sync set because `TokenKind` does not have a `Static` variant (confirmed via grep of `lexer/token.rs`); this matches the plan's Assumptions section. / - Took the "non-refactor" option per Step 4 / Assumptions: left `expect` unchanged, added `expected_token_error` as a new method that pushes onto `self.errors` and calls `recover_to_sync`.
+    [43/113] add-error-recovery-sync-points: plan $0.49 / execute $0.49 / verified / committed 2784b69
+==> plan  parse-literal-expressions
+      plan: 90.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-literal-expressions-plan-20260427T043835113.txt
+==> exec  parse-literal-expressions

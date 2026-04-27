@@ -315,7 +315,7 @@
 
 ## 9. Expression parser
 
-- [ ] Parse literal expressions
+- [x] Parse literal expressions
   - [ ] Methods `Parser::parse_int_lit`, `parse_float_lit`, `parse_char_lit`, `parse_str_lit`, `parse_bool_lit`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::literal_expressions`
 

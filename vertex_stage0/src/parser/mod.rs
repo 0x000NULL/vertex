@@ -1,8 +1,11 @@
 use std::mem;
 
+use crate::ast::NodeId;
 use crate::error::{CompileError, ErrorAccumulator, ErrorCode, ErrorKind};
 use crate::lexer::token::{Token, TokenKind};
 use crate::span::Span;
+
+pub mod expr;
 
 static EOF_KIND: TokenKind = TokenKind::Eof;
 
@@ -10,6 +13,7 @@ pub struct Parser {
     pub tokens: Vec<Token>,
     pub pos: usize,
     pub errors: ErrorAccumulator,
+    next_node_id: u32,
 }
 
 impl Parser {
@@ -18,7 +22,14 @@ impl Parser {
             tokens,
             pos: 0,
             errors: ErrorAccumulator::new(),
+            next_node_id: 0,
         }
+    }
+
+    fn new_node_id(&mut self) -> NodeId {
+        let id = self.next_node_id;
+        self.next_node_id = self.next_node_id.wrapping_add(1);
+        NodeId(id)
     }
 
     pub fn peek(&self) -> &TokenKind {
