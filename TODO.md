@@ -445,7 +445,7 @@
   - [ ] `self`, `&self`, `&mut self`, `self: Box<Self>`, `self: Rc<Self>`
   - [ ] **Verify:** `cargo test --lib parser::item::tests::self_params`
 
-- [ ] Add generics and where-clauses to function items
+- [x] Add generics and where-clauses to function items
   - [ ] `fn foo<T, U>(x: T) -> U where T: Clone + Debug`
   - [ ] **Verify:** `cargo test --lib parser::item::tests::fn_generics_and_where`
 

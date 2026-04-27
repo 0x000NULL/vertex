@@ -2,7 +2,6 @@ use crate::ast::expr::{GenericArg, Path};
 use crate::ast::{NodeId, Type};
 use crate::span::Span;
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Generics {
     pub id: NodeId,

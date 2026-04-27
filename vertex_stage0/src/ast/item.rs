@@ -1,4 +1,5 @@
 use crate::ast::expr::Block;
+use crate::ast::generics::Generics;
 use crate::ast::ty::Type;
 use crate::ast::NodeId;
 use crate::span::Span;
@@ -27,6 +28,7 @@ pub struct FnDef {
     /// `None` = not `extern`. `Some(s)` = `extern` with named ABI string.
     /// An empty string `Some(String::new())` denotes a bare `extern fn` with no ABI literal.
     pub extern_abi: Option<String>,
+    pub generics: Option<Generics>,
 }
 
 #[allow(dead_code)]

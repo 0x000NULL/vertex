@@ -524,3 +524,9 @@
         [cross-item] Should `AttrArgs` store a raw `Vec<Token>` or a structured form (ident list, name=value, nested call tree)?
           default: `AttrArgs::Delimited(Vec<Token>)` — raw tokens. Each consumer slug interprets the slice for its own attribute; keeps stage0 simple and defers meta-syntax design.
 ==> plan  add-self-parameters
+      plan: 151.03s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-self-parameters-plan-20260427T073340255.txt
+==> exec  add-self-parameters
+      exec: 154.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\add-self-parameters-execute-20260427T073614298.txt
+      notes: - Split self-form parsing into three private helpers (`parse_self_param_value`, `parse_self_param_ref`, plus the public dispatcher `try_parse_self_param`) instead of inlining everything in one method, since the bare-`self` and `&[mut] self` forms share no consumed-tokens. Plan said "a helper", so this is a conservative interpretation that keeps each helper short. / - Added a small private `synth_self_path_type(span)` helper to build the `Type::Path(Self)` value reused by the value form (no annotation) and inside the `&self`/`&mut self` ref types — avoids duplicating the `Path` literal.
+    [30/72] add-self-parameters: plan $0.96 / execute $1.26 / verified / committed 63ce1e8
+==> plan  add-generics-and-where-clauses-to-function-items

@@ -1,4 +1,5 @@
 use crate::ast::expr::{Expr, GenericArg, Path, PathSegment};
+use crate::ast::generics::{Generics, TraitBound, TypeParam, WhereClause, WherePred};
 use crate::ast::item::{FnDef, Item, Param};
 use crate::ast::ty::Type;
 use crate::error::{CompileError, ErrorCode, ErrorKind};
@@ -143,6 +144,128 @@ impl Parser {
         })
     }
 
+    // Stopgap: replaced by `parse-path-types-with-generic-args`. Accepts a
+    // single bare identifier as the bound's path (single-segment, no generic
+    // args).
+    fn parse_trait_bound(&mut self) -> Result<TraitBound, CompileError> {
+        let ident_tok = self.expect(&TokenKind::Ident(String::new()))?;
+        let span = ident_tok.span;
+        let ident = match ident_tok.kind {
+            TokenKind::Ident(s) => s,
+            _ => unreachable!(),
+        };
+        let path_id = self.new_node_id();
+        let path = Path {
+            id: path_id,
+            span,
+            segments: vec![PathSegment {
+                ident,
+                generic_args: Vec::new(),
+            }],
+        };
+        let id = self.new_node_id();
+        Ok(TraitBound {
+            id,
+            span,
+            path,
+            generic_args: Vec::new(),
+        })
+    }
+
+    fn parse_bounds(&mut self) -> Result<Vec<TraitBound>, CompileError> {
+        let mut bounds = vec![self.parse_trait_bound()?];
+        while self.eat(&TokenKind::Plus) {
+            bounds.push(self.parse_trait_bound()?);
+        }
+        Ok(bounds)
+    }
+
+    // Caller guarantees the next token is `Lt`. Returns the parsed parameter
+    // list and the span of the closing `>`. Note: nested generics like
+    // `Vec<Vec<T>>` would lex `>>` as `Shr` and are not handled here — full
+    // type parsing arrives with `parse-path-types-with-generic-args`.
+    fn parse_generics_params(&mut self) -> Result<(Vec<TypeParam>, Span), CompileError> {
+        debug_assert!(matches!(self.peek(), TokenKind::Lt));
+        self.bump();
+        let mut params: Vec<TypeParam> = Vec::new();
+        let gt_span;
+        loop {
+            if matches!(self.peek(), TokenKind::Gt) {
+                let gt_tok = self.bump();
+                gt_span = gt_tok.span;
+                break;
+            }
+            let name_tok = self.expect(&TokenKind::Ident(String::new()))?;
+            let name_span = name_tok.span;
+            let name = match name_tok.kind {
+                TokenKind::Ident(s) => s,
+                _ => unreachable!(),
+            };
+            let mut bounds: Vec<TraitBound> = Vec::new();
+            let mut end_span = name_span;
+            if self.eat(&TokenKind::Colon) {
+                let parsed = self.parse_bounds()?;
+                if let Some(last) = parsed.last() {
+                    end_span = last.span;
+                }
+                bounds = parsed;
+            }
+            let span = name_span.merge(&end_span);
+            let id = self.new_node_id();
+            params.push(TypeParam {
+                id,
+                span,
+                name,
+                bounds,
+            });
+            let term = self.expect_one_of(&[TokenKind::Comma, TokenKind::Gt])?;
+            if matches!(term.kind, TokenKind::Gt) {
+                gt_span = term.span;
+                break;
+            }
+        }
+        Ok((params, gt_span))
+    }
+
+    // Caller guarantees the next token is `Where`. Stops the predicate loop
+    // when the next token is `LBrace` (body) or `Semi`.
+    fn parse_where_clause(&mut self) -> Result<WhereClause, CompileError> {
+        debug_assert!(matches!(self.peek(), TokenKind::Where));
+        let where_tok = self.bump();
+        let where_span = where_tok.span;
+        let mut predicates: Vec<WherePred> = Vec::new();
+        let mut end_span = where_span;
+        loop {
+            if matches!(self.peek(), TokenKind::LBrace | TokenKind::Semi) {
+                break;
+            }
+            let ty = self.parse_type()?;
+            let ty_span = type_span(&ty);
+            self.expect(&TokenKind::Colon)?;
+            let bounds = self.parse_bounds()?;
+            let last_bound_span = bounds.last().map(|b| b.span).unwrap_or(ty_span);
+            let pred_span = ty_span.merge(&last_bound_span);
+            let pred_id = self.new_node_id();
+            end_span = pred_span;
+            predicates.push(WherePred {
+                id: pred_id,
+                span: pred_span,
+                ty,
+                bounds,
+            });
+            if !self.eat(&TokenKind::Comma) {
+                break;
+            }
+        }
+        let id = self.new_node_id();
+        let span = where_span.merge(&end_span);
+        Ok(WhereClause {
+            id,
+            span,
+            predicates,
+        })
+    }
+
     pub fn parse_fn(&mut self) -> Result<Item, CompileError> {
         let mut is_const = false;
         let mut is_unsafe = false;
@@ -224,6 +347,15 @@ impl Parser {
             _ => unreachable!(),
         };
 
+        let mut generic_params: Vec<TypeParam> = Vec::new();
+        let mut generics_list_span: Option<Span> = None;
+        if matches!(self.peek(), TokenKind::Lt) {
+            let lt_span = self.tokens[self.pos].span;
+            let (params, gt_span) = self.parse_generics_params()?;
+            generic_params = params;
+            generics_list_span = Some(lt_span.merge(&gt_span));
+        }
+
         self.expect(&TokenKind::LParen)?;
         let mut params: Vec<Param> = Vec::new();
         let mut had_self = false;
@@ -265,9 +397,33 @@ impl Parser {
             None
         };
 
+        let where_clause = if matches!(self.peek(), TokenKind::Where) {
+            Some(self.parse_where_clause()?)
+        } else {
+            None
+        };
+
         let body = match self.parse_block()? {
             Expr::Block(b) => b,
             other => unreachable!("parse_block returned non-block: {:?}", other),
+        };
+
+        let generics = if generics_list_span.is_some() || where_clause.is_some() {
+            let span = match (generics_list_span, where_clause.as_ref()) {
+                (Some(a), Some(w)) => a.merge(&w.span),
+                (Some(a), None) => a,
+                (None, Some(w)) => w.span,
+                (None, None) => unreachable!(),
+            };
+            let id = self.new_node_id();
+            Some(Generics {
+                id,
+                span,
+                params: generic_params,
+                where_clause,
+            })
+        } else {
+            None
         };
 
         let span = start_span.merge(&body.span);
@@ -282,6 +438,7 @@ impl Parser {
             is_const,
             is_unsafe,
             extern_abi,
+            generics,
         }))
     }
 }
@@ -745,6 +902,58 @@ mod tests {
         assert_eq!(f.params[1].name, "x");
         assert!(!f.params[1].is_self);
         assert_eq!(type_ident(&f.params[1].ty), "i32");
+        assert!(p.errors.is_empty());
+        assert!(matches!(p.peek(), TokenKind::Eof));
+    }
+
+    #[test]
+    fn fn_generics_and_where() {
+        // fn foo<T, U>(x: T) -> U where T: Clone + Debug { }
+        let mut p = Parser::new(vec![
+            tok(TokenKind::Fn),
+            ident_tok("foo"),
+            tok(TokenKind::Lt),
+            ident_tok("T"),
+            tok(TokenKind::Comma),
+            ident_tok("U"),
+            tok(TokenKind::Gt),
+            tok(TokenKind::LParen),
+            ident_tok("x"),
+            tok(TokenKind::Colon),
+            ident_tok("T"),
+            tok(TokenKind::RParen),
+            tok(TokenKind::Arrow),
+            ident_tok("U"),
+            tok(TokenKind::Where),
+            ident_tok("T"),
+            tok(TokenKind::Colon),
+            ident_tok("Clone"),
+            tok(TokenKind::Plus),
+            ident_tok("Debug"),
+            tok(TokenKind::LBrace),
+            tok(TokenKind::RBrace),
+            tok(TokenKind::Eof),
+        ]);
+        let f = as_fn(p.parse_fn().expect("parse_fn"));
+        assert_eq!(f.name, "foo");
+        let generics = f.generics.as_ref().expect("generics");
+        assert_eq!(generics.params.len(), 2);
+        assert_eq!(generics.params[0].name, "T");
+        assert!(generics.params[0].bounds.is_empty());
+        assert_eq!(generics.params[1].name, "U");
+        assert!(generics.params[1].bounds.is_empty());
+        let wc = generics.where_clause.as_ref().expect("where_clause");
+        assert_eq!(wc.predicates.len(), 1);
+        let pred = &wc.predicates[0];
+        assert_eq!(type_ident(&pred.ty), "T");
+        assert_eq!(pred.bounds.len(), 2);
+        assert_eq!(pred.bounds[0].path.segments.len(), 1);
+        assert_eq!(pred.bounds[0].path.segments[0].ident, "Clone");
+        assert_eq!(pred.bounds[1].path.segments.len(), 1);
+        assert_eq!(pred.bounds[1].path.segments[0].ident, "Debug");
+        assert_eq!(f.params.len(), 1);
+        assert_eq!(f.params[0].name, "x");
+        assert_eq!(type_ident(&f.params[0].ty), "T");
         assert!(p.errors.is_empty());
         assert!(matches!(p.peek(), TokenKind::Eof));
     }
