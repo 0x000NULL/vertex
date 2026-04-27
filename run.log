@@ -377,3 +377,9 @@
       notes: - The plan said "save `lparen_span = tok.span`" but did not pre-name the bumped variable; I named it `lparen_tok` (parallel to `rparen_tok` used later) before reading `.span`. / - For the `Comma` branch the plan referenced `rparen_span` but did not name the binding for the result of `expect(&TokenKind::RParen)?`; I bound it to `rparen_tok` and read `.span`. `expect` returns `Result<Token, CompileError>` per `parser/mod.rs`, so this is the natural plumbing.
     [5/72] parse-parenthesized-tuple-unit: plan $0.66 / execute $0.68 / verified / committed 8602aca
 ==> plan  parse-unary-prefix-expressions
+      plan: 119.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-unary-prefix-expressions-plan-20260427T053409417.txt
+==> exec  parse-unary-prefix-expressions
+      exec: 124.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\parse-unary-prefix-expressions-execute-20260427T053613457.txt
+      notes: - Captured `op_span` using the same fallback chain as `unexpected_token_error` (current token, else last token, else dummy span at `FileId(0)`) to handle pathological empty-token-vec inputs safely. The plan said "or `current_span`-equivalent" — `current_span` is a private method on `Parser`, so I inlined the equivalent logic rather than widening its visibility. / - For the wrong-head test (`[Plus, Eof]`), I asserted `is_err()` and `pos == 0` but did NOT assert `p.errors.is_empty()` because the plan's "Each successful case asserts `p.errors.is_empty()`" qualifier explicitly excludes error cases; this matches the prior `paren_tuple_unit` wrong-head subcase which also omits the empty-errors assertion.
+    [6/72] parse-unary-prefix-expressions: plan $0.71 / execute $0.71 / verified / committed 2f6f20a
+==> plan  pratt-parser-for-binary-operators

@@ -1,7 +1,16 @@
-use crate::ast::expr::{BoolLit, CharLit, Expr, FloatLit, IntLit, StrLit, TupleLit, Unary, UnaryOp};
+use crate::ast::expr::{
+    Binary, BinaryOp, BoolLit, CharLit, Expr, FloatLit, IntLit, StrLit, TupleLit, Unary, UnaryOp,
+};
 use crate::error::{CompileError, ErrorCode, ErrorKind};
 use crate::lexer::token::TokenKind;
 use crate::parser::Parser;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OpClass {
+    Comparison,
+    Assignment,
+    Other,
+}
 
 impl Parser {
     pub fn parse_int_lit(&mut self) -> Result<Expr, CompileError> {
@@ -134,6 +143,59 @@ impl Parser {
         }
     }
 
+    pub fn parse_expr(&mut self) -> Result<Expr, CompileError> {
+        self.parse_binary(0)
+    }
+
+    fn parse_binary(&mut self, min_bp: u8) -> Result<Expr, CompileError> {
+        let mut lhs = self.parse_unary()?;
+
+        while let Some((left_bp, right_bp, op, class)) = infix_binding_power(self.peek()) {
+            if left_bp < min_bp {
+                break;
+            }
+
+            // Non-associative comparisons: reject `a < b < c` style chains.
+            // NOTE: `parse_paren_or_tuple` currently unwraps `(expr)` to the inner
+            // `Expr`, so a parenthesized comparison still surfaces as `Expr::Binary`
+            // and would also trip this check. TODO: revisit if real code hits this
+            // (e.g. add a `Paren` wrapper or track a "made-at-this-level" flag).
+            if class == OpClass::Comparison {
+                if let Expr::Binary(b) = &lhs {
+                    if is_comparison_op(b.op) {
+                        let op_span = if self.pos < self.tokens.len() {
+                            self.tokens[self.pos].span
+                        } else if let Some(last) = self.tokens.last() {
+                            last.span
+                        } else {
+                            crate::span::Span::new(crate::span::FileId(0), 0, 0)
+                        };
+                        return Err(CompileError::new(
+                            ErrorCode::E0100,
+                            ErrorKind::Syntax,
+                            op_span,
+                            "chained comparison operators require parentheses",
+                        ));
+                    }
+                }
+            }
+
+            self.bump();
+            let rhs = self.parse_binary(right_bp)?;
+            let span = lhs.span().merge(&rhs.span());
+            let id = self.new_node_id();
+            lhs = Expr::Binary(Binary {
+                id,
+                span,
+                op,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            });
+        }
+
+        Ok(lhs)
+    }
+
     pub fn parse_unary(&mut self) -> Result<Expr, CompileError> {
         let op_span = if self.pos < self.tokens.len() {
             self.tokens[self.pos].span
@@ -205,6 +267,44 @@ impl Parser {
         );
         CompileError::new(ErrorCode::E0100, ErrorKind::Syntax, span, message)
     }
+}
+
+fn is_comparison_op(op: BinaryOp) -> bool {
+    matches!(
+        op,
+        BinaryOp::Eq | BinaryOp::Ne | BinaryOp::Lt | BinaryOp::Gt | BinaryOp::Le | BinaryOp::Ge
+    )
+}
+
+fn infix_binding_power(kind: &TokenKind) -> Option<(u8, u8, BinaryOp, OpClass)> {
+    let result = match kind {
+        TokenKind::Eq => (2, 1, BinaryOp::Assign, OpClass::Assignment),
+        TokenKind::PlusEq => (2, 1, BinaryOp::AddAssign, OpClass::Assignment),
+        TokenKind::MinusEq => (2, 1, BinaryOp::SubAssign, OpClass::Assignment),
+        TokenKind::StarEq => (2, 1, BinaryOp::MulAssign, OpClass::Assignment),
+        TokenKind::SlashEq => (2, 1, BinaryOp::DivAssign, OpClass::Assignment),
+        TokenKind::PercentEq => (2, 1, BinaryOp::RemAssign, OpClass::Assignment),
+        TokenKind::Or => (3, 4, BinaryOp::Or, OpClass::Other),
+        TokenKind::And => (5, 6, BinaryOp::And, OpClass::Other),
+        TokenKind::EqEq => (7, 8, BinaryOp::Eq, OpClass::Comparison),
+        TokenKind::BangEq => (7, 8, BinaryOp::Ne, OpClass::Comparison),
+        TokenKind::Lt => (7, 8, BinaryOp::Lt, OpClass::Comparison),
+        TokenKind::Gt => (7, 8, BinaryOp::Gt, OpClass::Comparison),
+        TokenKind::Le => (7, 8, BinaryOp::Le, OpClass::Comparison),
+        TokenKind::Ge => (7, 8, BinaryOp::Ge, OpClass::Comparison),
+        TokenKind::Pipe => (9, 10, BinaryOp::BitOr, OpClass::Other),
+        TokenKind::Caret => (11, 12, BinaryOp::BitXor, OpClass::Other),
+        TokenKind::Amp => (13, 14, BinaryOp::BitAnd, OpClass::Other),
+        TokenKind::Shl => (15, 16, BinaryOp::Shl, OpClass::Other),
+        TokenKind::Shr => (15, 16, BinaryOp::Shr, OpClass::Other),
+        TokenKind::Plus => (17, 18, BinaryOp::Add, OpClass::Other),
+        TokenKind::Minus => (17, 18, BinaryOp::Sub, OpClass::Other),
+        TokenKind::Star => (19, 20, BinaryOp::Mul, OpClass::Other),
+        TokenKind::Slash => (19, 20, BinaryOp::Div, OpClass::Other),
+        TokenKind::Percent => (19, 20, BinaryOp::Rem, OpClass::Other),
+        _ => return None,
+    };
+    Some(result)
 }
 
 fn describe_kind(kind: &TokenKind) -> &'static str {
@@ -445,7 +545,10 @@ mod tests {
                     other => panic!("expected IntLit operand, got {:?}", other),
                 }
             }
-            other => panic!("expected Ok(Unary(Neg, IntLit)) for `-7i32`, got {:?}", other),
+            other => panic!(
+                "expected Ok(Unary(Neg, IntLit)) for `-7i32`, got {:?}",
+                other
+            ),
         }
         assert_eq!(p.pos, 2);
         assert!(p.errors.is_empty());
@@ -464,7 +567,10 @@ mod tests {
                     other => panic!("expected BoolLit operand, got {:?}", other),
                 }
             }
-            other => panic!("expected Ok(Unary(Not, BoolLit)) for `not true`, got {:?}", other),
+            other => panic!(
+                "expected Ok(Unary(Not, BoolLit)) for `not true`, got {:?}",
+                other
+            ),
         }
         assert!(p.errors.is_empty());
 
@@ -482,7 +588,10 @@ mod tests {
                     other => panic!("expected IntLit operand, got {:?}", other),
                 }
             }
-            other => panic!("expected Ok(Unary(Deref, IntLit)) for `*1i32`, got {:?}", other),
+            other => panic!(
+                "expected Ok(Unary(Deref, IntLit)) for `*1i32`, got {:?}",
+                other
+            ),
         }
         assert!(p.errors.is_empty());
 
@@ -500,7 +609,10 @@ mod tests {
                     other => panic!("expected IntLit operand, got {:?}", other),
                 }
             }
-            other => panic!("expected Ok(Unary(Ref, IntLit)) for `&1i32`, got {:?}", other),
+            other => panic!(
+                "expected Ok(Unary(Ref, IntLit)) for `&1i32`, got {:?}",
+                other
+            ),
         }
         assert_eq!(p.pos, 2);
         assert!(p.errors.is_empty());
@@ -520,7 +632,10 @@ mod tests {
                     other => panic!("expected IntLit operand, got {:?}", other),
                 }
             }
-            other => panic!("expected Ok(Unary(RefMut, IntLit)) for `&mut 1i32`, got {:?}", other),
+            other => panic!(
+                "expected Ok(Unary(RefMut, IntLit)) for `&mut 1i32`, got {:?}",
+                other
+            ),
         }
         assert_eq!(p.pos, 3);
         assert!(p.errors.is_empty());
@@ -546,7 +661,10 @@ mod tests {
                     other => panic!("expected inner Unary(Neg), got {:?}", other),
                 }
             }
-            other => panic!("expected Ok(Unary(Neg, Unary(Neg, _))) for `- - 7i32`, got {:?}", other),
+            other => panic!(
+                "expected Ok(Unary(Neg, Unary(Neg, _))) for `- - 7i32`, got {:?}",
+                other
+            ),
         }
         assert_eq!(p.pos, 3);
         assert!(p.errors.is_empty());
@@ -572,7 +690,10 @@ mod tests {
                     other => panic!("expected inner Unary(Deref), got {:?}", other),
                 }
             }
-            other => panic!("expected Ok(Unary(Ref, Unary(Deref, _))) for `& * 1i32`, got {:?}", other),
+            other => panic!(
+                "expected Ok(Unary(Ref, Unary(Deref, _))) for `& * 1i32`, got {:?}",
+                other
+            ),
         }
         assert!(p.errors.is_empty());
 
@@ -595,5 +716,197 @@ mod tests {
         let mut p = Parser::new(vec![tok(TokenKind::Plus), tok(TokenKind::Eof)]);
         assert!(p.parse_unary().is_err());
         assert_eq!(p.pos, 0);
+    }
+
+    fn int_tok(v: u64) -> Token {
+        tok(TokenKind::IntLiteral(v, IntSuffix::I32))
+    }
+
+    fn binary_of(e: &Expr) -> &crate::ast::expr::Binary {
+        match e {
+            Expr::Binary(b) => b,
+            other => panic!("expected Binary, got {:?}", other),
+        }
+    }
+
+    fn int_value(e: &Expr) -> u64 {
+        match e {
+            Expr::IntLit(lit) => lit.value,
+            other => panic!("expected IntLit, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn operator_precedence() {
+        use crate::ast::expr::BinaryOp;
+
+        // 1 + 2 * 3 → Add(1, Mul(2, 3))
+        let mut p = Parser::new(vec![
+            int_tok(1),
+            tok(TokenKind::Plus),
+            int_tok(2),
+            tok(TokenKind::Star),
+            int_tok(3),
+            tok(TokenKind::Eof),
+        ]);
+        let expr = p.parse_expr().expect("ok");
+        let outer = binary_of(&expr);
+        assert_eq!(outer.op, BinaryOp::Add);
+        assert_eq!(int_value(&outer.lhs), 1);
+        let inner = binary_of(&outer.rhs);
+        assert_eq!(inner.op, BinaryOp::Mul);
+        assert_eq!(int_value(&inner.lhs), 2);
+        assert_eq!(int_value(&inner.rhs), 3);
+
+        // 1 * 2 + 3 → Add(Mul(1, 2), 3)
+        let mut p = Parser::new(vec![
+            int_tok(1),
+            tok(TokenKind::Star),
+            int_tok(2),
+            tok(TokenKind::Plus),
+            int_tok(3),
+            tok(TokenKind::Eof),
+        ]);
+        let expr = p.parse_expr().expect("ok");
+        let outer = binary_of(&expr);
+        assert_eq!(outer.op, BinaryOp::Add);
+        assert_eq!(int_value(&outer.rhs), 3);
+        let inner = binary_of(&outer.lhs);
+        assert_eq!(inner.op, BinaryOp::Mul);
+        assert_eq!(int_value(&inner.lhs), 1);
+        assert_eq!(int_value(&inner.rhs), 2);
+
+        // 1 - 2 - 3 → Sub(Sub(1, 2), 3)  (left-assoc)
+        let mut p = Parser::new(vec![
+            int_tok(1),
+            tok(TokenKind::Minus),
+            int_tok(2),
+            tok(TokenKind::Minus),
+            int_tok(3),
+            tok(TokenKind::Eof),
+        ]);
+        let expr = p.parse_expr().expect("ok");
+        let outer = binary_of(&expr);
+        assert_eq!(outer.op, BinaryOp::Sub);
+        assert_eq!(int_value(&outer.rhs), 3);
+        let inner = binary_of(&outer.lhs);
+        assert_eq!(inner.op, BinaryOp::Sub);
+        assert_eq!(int_value(&inner.lhs), 1);
+        assert_eq!(int_value(&inner.rhs), 2);
+
+        // 1 = 2 = 3 → Assign(1, Assign(2, 3))  (right-assoc; placeholders for paths)
+        let mut p = Parser::new(vec![
+            int_tok(1),
+            tok(TokenKind::Eq),
+            int_tok(2),
+            tok(TokenKind::Eq),
+            int_tok(3),
+            tok(TokenKind::Eof),
+        ]);
+        let expr = p.parse_expr().expect("ok");
+        let outer = binary_of(&expr);
+        assert_eq!(outer.op, BinaryOp::Assign);
+        assert_eq!(int_value(&outer.lhs), 1);
+        let inner = binary_of(&outer.rhs);
+        assert_eq!(inner.op, BinaryOp::Assign);
+        assert_eq!(int_value(&inner.lhs), 2);
+        assert_eq!(int_value(&inner.rhs), 3);
+
+        // 1 | 2 & 3 → BitOr(1, BitAnd(2, 3))
+        let mut p = Parser::new(vec![
+            int_tok(1),
+            tok(TokenKind::Pipe),
+            int_tok(2),
+            tok(TokenKind::Amp),
+            int_tok(3),
+            tok(TokenKind::Eof),
+        ]);
+        let expr = p.parse_expr().expect("ok");
+        let outer = binary_of(&expr);
+        assert_eq!(outer.op, BinaryOp::BitOr);
+        assert_eq!(int_value(&outer.lhs), 1);
+        let inner = binary_of(&outer.rhs);
+        assert_eq!(inner.op, BinaryOp::BitAnd);
+        assert_eq!(int_value(&inner.lhs), 2);
+        assert_eq!(int_value(&inner.rhs), 3);
+
+        // 1 == 2 and 3 == 4 → And(Eq(1, 2), Eq(3, 4))
+        let mut p = Parser::new(vec![
+            int_tok(1),
+            tok(TokenKind::EqEq),
+            int_tok(2),
+            tok(TokenKind::And),
+            int_tok(3),
+            tok(TokenKind::EqEq),
+            int_tok(4),
+            tok(TokenKind::Eof),
+        ]);
+        let expr = p.parse_expr().expect("ok");
+        let outer = binary_of(&expr);
+        assert_eq!(outer.op, BinaryOp::And);
+        let left = binary_of(&outer.lhs);
+        assert_eq!(left.op, BinaryOp::Eq);
+        assert_eq!(int_value(&left.lhs), 1);
+        assert_eq!(int_value(&left.rhs), 2);
+        let right = binary_of(&outer.rhs);
+        assert_eq!(right.op, BinaryOp::Eq);
+        assert_eq!(int_value(&right.lhs), 3);
+        assert_eq!(int_value(&right.rhs), 4);
+
+        // 1 and 2 or 3 → Or(And(1, 2), 3)
+        let mut p = Parser::new(vec![
+            int_tok(1),
+            tok(TokenKind::And),
+            int_tok(2),
+            tok(TokenKind::Or),
+            int_tok(3),
+            tok(TokenKind::Eof),
+        ]);
+        let expr = p.parse_expr().expect("ok");
+        let outer = binary_of(&expr);
+        assert_eq!(outer.op, BinaryOp::Or);
+        assert_eq!(int_value(&outer.rhs), 3);
+        let inner = binary_of(&outer.lhs);
+        assert_eq!(inner.op, BinaryOp::And);
+        assert_eq!(int_value(&inner.lhs), 1);
+        assert_eq!(int_value(&inner.rhs), 2);
+
+        // 1 << 2 + 3 → Shl(1, Add(2, 3))  (`+` binds tighter than `<<`)
+        let mut p = Parser::new(vec![
+            int_tok(1),
+            tok(TokenKind::Shl),
+            int_tok(2),
+            tok(TokenKind::Plus),
+            int_tok(3),
+            tok(TokenKind::Eof),
+        ]);
+        let expr = p.parse_expr().expect("ok");
+        let outer = binary_of(&expr);
+        assert_eq!(outer.op, BinaryOp::Shl);
+        assert_eq!(int_value(&outer.lhs), 1);
+        let inner = binary_of(&outer.rhs);
+        assert_eq!(inner.op, BinaryOp::Add);
+        assert_eq!(int_value(&inner.lhs), 2);
+        assert_eq!(int_value(&inner.rhs), 3);
+    }
+
+    #[test]
+    fn comparison_non_associative_rejected() {
+        // `1 < 2 < 3` → Err with E0100
+        let mut p = Parser::new(vec![
+            int_tok(1),
+            tok(TokenKind::Lt),
+            int_tok(2),
+            tok(TokenKind::Lt),
+            int_tok(3),
+            tok(TokenKind::Eof),
+        ]);
+        match p.parse_expr() {
+            Err(e) => assert_eq!(e.code, ErrorCode::E0100),
+            Ok(other) => panic!(
+                "expected Err with E0100 for `1 < 2 < 3`, got Ok({:?})",
+                other
+            ),
+        }
     }
 }

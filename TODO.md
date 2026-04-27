@@ -331,7 +331,7 @@
   - [ ] `-`, `not`, `*` (deref), `&`, `&mut`
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::unary_prefix`
 
-- [ ] Pratt parser for binary operators
+- [x] Pratt parser for binary operators
   - [ ] Precedence table: `*, /, % > +, - > <<, >> > & > ^ > | > comparisons > and > or`
   - [ ] Comparison non-associative (reject `a < b < c`)
   - [ ] **Verify:** `cargo test --lib parser::expr::tests::operator_precedence`; `cargo test --lib parser::expr::tests::comparison_non_associative_rejected`
