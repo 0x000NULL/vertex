@@ -218,7 +218,7 @@
   - [ ] Emit error spanning open-quote → EOF; continue at EOF
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::unterminated_string_recovers`
 
-- [ ] Invalid numeric literal recovery
+- [x] Invalid numeric literal recovery
   - [ ] On parse failure, emit error and advance past the offending run
   - [ ] **Verify:** `cargo test --lib lexer::scan::tests::invalid_numeric_recovers`
 

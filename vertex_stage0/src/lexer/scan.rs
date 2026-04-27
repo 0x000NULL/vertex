@@ -785,11 +785,27 @@ impl<'a> Scanner<'a> {
                         if let Some((v, suf, span)) = self.scan_int_hex() {
                             return Token::new(TokenKind::IntLiteral(v, suf), span);
                         }
+                        self.pos += 2;
+                        self.eat_while(|b| b.is_ascii_alphanumeric() || b == b'_');
+                        let span = Span::new(self.file_id, start, self.pos as u32);
+                        let lex = &self.src[start as usize..self.pos];
+                        return Token::new(
+                            TokenKind::Error(format!("invalid numeric literal: {}", lex)),
+                            span,
+                        );
                     }
                     Some(b'b') | Some(b'B') => {
                         if let Some((v, suf, span)) = self.scan_int_bin() {
                             return Token::new(TokenKind::IntLiteral(v, suf), span);
                         }
+                        self.pos += 2;
+                        self.eat_while(|b| b.is_ascii_alphanumeric() || b == b'_');
+                        let span = Span::new(self.file_id, start, self.pos as u32);
+                        let lex = &self.src[start as usize..self.pos];
+                        return Token::new(
+                            TokenKind::Error(format!("invalid numeric literal: {}", lex)),
+                            span,
+                        );
                     }
                     _ => {}
                 }
@@ -1706,6 +1722,91 @@ mod tests {
         let euro_span = errors[2].span;
         assert_eq!(euro_span.end - euro_span.start, '\u{20ac}'.len_utf8() as u32);
         assert!(euro_span.end - euro_span.start > 1);
+
+        let last = tokens.last().expect("tokens has Eof");
+        assert!(matches!(last.kind, TokenKind::Eof));
+        assert_eq!(last.span.start, last.span.end);
+        assert_eq!(last.span.start as usize, src.len());
+    }
+
+    #[test]
+    fn invalid_numeric_recovers() {
+        let src = "0x foo 0xg bar 0x_ baz 0b qux 0b2 quux 0b_ end";
+        let file_id = FileId(61);
+        let mut s = Scanner::new(src, file_id);
+
+        let mut tokens: Vec<Token> = Vec::new();
+        loop {
+            let t = s.next_token();
+            let is_eof = matches!(&t.kind, TokenKind::Eof);
+            tokens.push(t);
+            if is_eof {
+                break;
+            }
+        }
+
+        let kinds: Vec<TokenKind> = tokens.iter().map(|t| t.kind.clone()).collect();
+        let expected = vec![
+            TokenKind::Error("invalid numeric literal: 0x".to_string()),
+            TokenKind::Ident("foo".to_string()),
+            TokenKind::Error("invalid numeric literal: 0xg".to_string()),
+            TokenKind::Ident("bar".to_string()),
+            TokenKind::Error("invalid numeric literal: 0x_".to_string()),
+            TokenKind::Ident("baz".to_string()),
+            TokenKind::Error("invalid numeric literal: 0b".to_string()),
+            TokenKind::Ident("qux".to_string()),
+            TokenKind::Error("invalid numeric literal: 0b2".to_string()),
+            TokenKind::Ident("quux".to_string()),
+            TokenKind::Error("invalid numeric literal: 0b_".to_string()),
+            TokenKind::Ident("end".to_string()),
+            TokenKind::Eof,
+        ];
+        assert_eq!(kinds, expected);
+
+        for t in &tokens {
+            assert_eq!(t.span.file_id, file_id);
+        }
+
+        let errors: Vec<&Token> = tokens
+            .iter()
+            .filter(|t| matches!(t.kind, TokenKind::Error(_)))
+            .collect();
+        assert_eq!(errors.len(), 6);
+
+        let cases: &[(&str, &str)] = &[
+            ("invalid numeric literal: 0x", "0x"),
+            ("invalid numeric literal: 0xg", "0xg"),
+            ("invalid numeric literal: 0x_", "0x_"),
+            ("invalid numeric literal: 0b", "0b"),
+            ("invalid numeric literal: 0b2", "0b2"),
+            ("invalid numeric literal: 0b_", "0b_"),
+        ];
+        for (i, (msg, lex)) in cases.iter().enumerate() {
+            let tok = errors[i];
+            match &tok.kind {
+                TokenKind::Error(m) => assert_eq!(m, msg, "error message for {:?}", lex),
+                _ => unreachable!(),
+            }
+            let start = tok.span.start as usize;
+            let end = tok.span.end as usize;
+            let expected_start = src
+                .find(*lex)
+                .expect("test source should contain each malformed run");
+            assert_eq!(start, expected_start, "span.start for {:?}", lex);
+            assert_eq!(end, expected_start + lex.len(), "span.end for {:?}", lex);
+            assert_eq!(&src[start..end], *lex, "span lexeme for {:?}", lex);
+        }
+
+        let mut prev_end: u32 = 0;
+        for t in &tokens {
+            assert!(
+                t.span.start >= prev_end,
+                "span not monotonic: prev_end={}, token={:?}",
+                prev_end,
+                t
+            );
+            prev_end = t.span.end;
+        }
 
         let last = tokens.last().expect("tokens has Eof");
         assert!(matches!(last.kind, TokenKind::Eof));
