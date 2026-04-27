@@ -242,3 +242,25 @@ plan=1.225086 exec=2.277349 total=3.502435
 
 ---
 
+
+## end-to-end-recovery-test
+- Item: End-to-end recovery test
+- Reason: blockers
+- Timestamp: 2026-04-27T07:10:20.6013968Z
+
+### Blocker: Recovered representation of `let x = ;`
+- severity: cross-item
+- affects: parse-let-statements, end-to-end-recovery-test
+- question: After diagnosing the missing initializer, should the recovered first statement be `Stmt::Let { init: None }`, `Stmt::Let { init: Some(Expr::Error(..)) }`, or skipped entirely (no statement pushed)?
+- default_assumption: Don't pin the shape. Test asserts `errors.len() == 1` plus presence of a valid `Stmt::Let` with `pattern==y` and `init==Some(IntLit(10))`, so any of those three recovery shapes passes.
+- Resolution: 
+
+### Blocker: Block-loop re-entry after `let` recovery
+- severity: cross-item
+- affects: parser::recover_to_sync, parse_block, parse-let-statements
+- question: Does the parse_block loop re-enter cleanly on `Let` after `recover_to_sync` consumes the trailing `;`, or does `Let` need to be added to `is_sync_point` so recovery stops *at* `let` rather than past it?
+- default_assumption: Current `recover_to_sync` stops at the `;` then consumes it, leaving `Let` as the next peek; the block loop sees `Let != RBrace/Eof` and dispatches again. No change to `is_sync_point` required from this plan; if the prereq disagrees, this test will fail loudly.
+- Resolution: 
+
+---
+

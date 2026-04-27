@@ -423,7 +423,7 @@
 
 ## 12. Item parsers — functions
 
-- [ ] Parse plain function items
+- [x] Parse plain function items
   - [ ] `fn name(params) -> ret_ty { body }`
   - [ ] Param: `name: Type` (no patterns yet)
   - [ ] **Verify:** `cargo test --lib parser::item::tests::plain_fn`

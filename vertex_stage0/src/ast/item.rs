@@ -1,11 +1,26 @@
+use crate::ast::expr::Block;
+use crate::ast::ty::Type;
 use crate::ast::NodeId;
 use crate::span::Span;
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct Param {
+    pub id: NodeId,
+    pub span: Span,
+    pub name: String,
+    pub ty: Type,
+}
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct FnDef {
     pub id: NodeId,
     pub span: Span,
+    pub name: String,
+    pub params: Vec<Param>,
+    pub ret_ty: Option<Type>,
+    pub body: Block,
 }
 
 #[allow(dead_code)]

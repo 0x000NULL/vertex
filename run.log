@@ -488,3 +488,7 @@
 ==> plan  expected-one-of-messages
       plan: 101.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\expected-one-of-messages-plan-20260427T070604988.txt
 ==> exec  expected-one-of-messages
+      exec: 74.02s, failure_mode=success, transcript=.claude\todo-runner\transcripts\expected-one-of-messages-execute-20260427T070719031.txt
+      notes: - Step 1 says "(or `&[TokenKind]` — see Assumptions)"; the Assumptions block selects `&[TokenKind]`, so I used that for both the helper and the methods. / - `format_candidate_list` is `fn` (private) rather than `pub fn`, matching the existing `describe`/`is_sync_point` privacy convention in the file.
+    [24/72] expected-one-of-messages: plan $0.63 / execute $0.48 / verified / committed d027987
+==> plan  end-to-end-recovery-test
